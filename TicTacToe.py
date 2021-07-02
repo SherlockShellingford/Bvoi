@@ -65,6 +65,7 @@ class TicTacToeBoard(Node):
                 sum += 0.05
             return 1
 
+
         def integrate_cdf(x):
             if self.buckets[0] > x:
                 return 0
