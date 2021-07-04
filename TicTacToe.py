@@ -14,14 +14,32 @@ X - -
 corrresponds to this tuple:
 (False, None, True, False, True, None, True, None, None)
 """
-
 from collections import namedtuple
 from random import choice, getrandbits
 from MCTS import MCTS, Node
 import numpy as np
 import math
 from scipy.stats import norm
+from alphazero.NNet import NNetWrapper
+
 _TTTB = namedtuple("TicTacToeBoard", "tup turn winner terminal")
+
+states=dict()
+states_cache_bvoi=dict()
+previous_tree = None
+alphazero_agent=None
+
+
+def load_tictactoe_alphazero():
+    alphazero_agent = NNetWrapper()
+    alphazero_agent.load_checkpoint('./pretrained_models/tictactoe/keras','best-25eps-25sim-10epch.pth.tar')
+
+
+
+
+
+
+
 
 # Inheriting from a namedtuple is convenient because it makes the class
 # immutable and predefines __init__, __repr__, __hash__, __eq__, and others
@@ -39,7 +57,7 @@ class TicTacToeBoard(Node):
         self.hash = getrandbits(128)
         self.probability_density = lambda x : norm.pdf(x, loc=meanvalue, scale=standard_derv, size=None)
         self.buckets=[]
-        for i in np.linspace(0,1,10):
+        for i in np.linspace(0,1,15):
             self.buckets.append(norm.ppf(i,loc=meanvalue, scale=standard_derv))
 
         def dist(x):
@@ -77,6 +95,12 @@ class TicTacToeBoard(Node):
         empty_spots = [i for i, value in enumerate(board.tup) if value is None]
         return board.make_move(choice(empty_spots))
 
+    def find_random_child_bvoi(board):
+        if board.terminal:
+            return None  # If the game is finished then no moves can be made
+        empty_spots = [i for i, value in enumerate(board.tup) if value is None]
+        return board.make_move_bvoi(choice(empty_spots))
+
     def reward(board):
         if not board.terminal:
             raise RuntimeError(f"reward called on nonterminal board {board}")
@@ -94,11 +118,33 @@ class TicTacToeBoard(Node):
         return board.terminal
 
     def make_move(board, index):
-        tup = board.tup[:index] + (board.turn,) + board.tup[index + 1 :]
+        tup = board.tup[:index] + ((1,) if board.turn else (-1,)) + board.tup[index + 1 :]
+        state=states.get(tup)
+        if state is not None:
+            return state
         turn = not board.turn
         winner = _find_winner(tup)
         is_terminal = (winner is not None) or not any(v is None for v in tup)
-        return TicTacToeBoard(not board.max, tup, turn, winner, is_terminal, 0, board.depth)
+        ret = TicTacToeBoard(not board.max, tup, turn, winner, is_terminal, 0, board.depth)
+        states[tup] = ret
+        return ret
+
+    def make_move_bvoi(board, index):
+        tup = board.tup[:index] + ((1,) if board.turn else (-1,)) + board.tup[index + 1 :]
+        state=states_cache_bvoi.get(tup)
+        if state is not None:
+            return state
+        turn = not board.turn
+        winner = _find_winner(tup)
+        is_terminal = (winner is not None) or not any(v is None for v in tup)
+        original_mcts_ret = states.get(tup)
+        print("Zura")
+        print(original_mcts_ret.tup)
+        value_of_original = previous_tree.Q[original_mcts_ret] / previous_tree.N[original_mcts_ret]
+        ret = TicTacToeBoard(not board.max, tup, turn, winner, is_terminal, value_of_original , board.depth)
+        states[tup] = ret
+        return ret
+
 
     def to_pretty_string(board):
         to_char = lambda v: ("X" if v is True else ("O" if v is False else " "))
@@ -112,9 +158,9 @@ class TicTacToeBoard(Node):
         )
 
 
-def play_game():
+def play_game(mode="uct"):
     board = new_tic_tac_toe_board()
-    tree = MCTS(board)
+    tree = MCTS(board, mode=mode)
     print(board.to_pretty_string())
     while True:
         #row_col = input("enter row,col: ")
@@ -134,6 +180,7 @@ def play_game():
         print(board.to_pretty_string())
         if board.terminal:
             break
+    return tree
 
 
 def _winning_combos():
@@ -149,9 +196,9 @@ def _find_winner(tup):
     "Returns None if no winner, True if X wins, False if O wins"
     for i1, i2, i3 in _winning_combos():
         v1, v2, v3 = tup[i1], tup[i2], tup[i3]
-        if False is v1 is v2 is v3:
+        if -1 is v1 is v2 is v3:
             return False
-        if True is v1 is v2 is v3:
+        if 1 is v1 is v2 is v3:
             return True
     return None
 
@@ -161,4 +208,9 @@ def new_tic_tac_toe_board():
 
 
 if __name__ == "__main__":
-    play_game()
+    tree = play_game()
+    for key in tree.N.keys():
+        print(key.tup, tree.N[key])
+    previous_tree = tree
+
+    play_game(mode="bvoi-greedy")
