@@ -27,20 +27,21 @@ _TTTB = namedtuple("TicTacToeBoard", "tup turn winner terminal")
 # immutable and predefines __init__, __repr__, __hash__, __eq__, and others
 class TicTacToeBoard(Node):
 
-    def __init__(self, max, tup, turn, winner, terminal, meanvalue, height):
-        standard_derv=height*0.3/9
+    def __init__(self, max, tup, turn, winner, terminal, meanvalue, depth):
+        standard_derv=(9-depth)*0.3/9
         self.max=max
         self.tup=tup
         self.turn=turn
         self.winner=winner
         self.terminal=terminal
         self.meanvalue=meanvalue
-
+        self.depth=depth
         self.hash = getrandbits(128)
         self.probability_density = lambda x : norm.pdf(x, loc=meanvalue, scale=standard_derv, size=None)
         self.buckets=[]
-        for i in np.linspace(0,1,20):
-            self.buckets.append(norm.ppf(i,loc=meanvalue, scale=standard_derv, size=None))
+        for i in np.linspace(0,1,10):
+            self.buckets.append(norm.ppf(i,loc=meanvalue, scale=standard_derv))
+
         def dist(x):
             if self.buckets[0]>x:
                 return self.buckets[0]
@@ -55,32 +56,7 @@ class TicTacToeBoard(Node):
                         return self.buckets[i]
             return self.buckets[-1]
 
-        def cdf(x):
-            if self.buckets[0] > x:
-                return 0
-            sum = 0
-            for i in range(1, len(self.buckets)):
-                if x < self.buckets[i]:
-                    return sum
-                sum += 0.05
-            return 1
-
-
-        def integrate_cdf(x):
-            if self.buckets[0] > x:
-                return 0
-            sum = 0
-            for i in range(1, len(self.buckets)):
-                if x < self.buckets[i]:
-                    d1 = x - self.buckets[i - 1]
-                    dt = self.buckets[i] - self.buckets[i - 1]
-                    return sum + 0.05 * i * (d1 / dt)
-                sum += 0.05
-            return sum + x - self.buckets[-1]
-
         self.distribution=lambda x : dist(norm.rvs(loc=meanvalue,scale=standard_derv, size=None))
-        self.cdf=lambda x : cdf(x)
-        self.cdf_integral=lambda x : integrate_cdf(x)
 
 
 
@@ -122,7 +98,7 @@ class TicTacToeBoard(Node):
         turn = not board.turn
         winner = _find_winner(tup)
         is_terminal = (winner is not None) or not any(v is None for v in tup)
-        return TicTacToeBoard(tup, turn, winner, is_terminal)
+        return TicTacToeBoard(not board.max, tup, turn, winner, is_terminal, 0, board.depth)
 
     def to_pretty_string(board):
         to_char = lambda v: ("X" if v is True else ("O" if v is False else " "))
@@ -152,7 +128,7 @@ def play_game():
         #    break
         # You can train as you go, or only at the beginning.
         # Here, we train as we go, doing fifty rollouts each turn.
-        for _ in range(100):
+        for _ in range(200):
             tree.do_rollout(board)
         board = tree.choose(board)
         print(board.to_pretty_string())
@@ -181,7 +157,7 @@ def _find_winner(tup):
 
 
 def new_tic_tac_toe_board():
-    return TicTacToeBoard(tup=(None,) * 9, turn=True, winner=None, terminal=False)
+    return TicTacToeBoard(True, (None,) * 9, True, None, False,0, 0)
 
 
 if __name__ == "__main__":

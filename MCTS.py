@@ -28,26 +28,93 @@ class MCTS:
 
 
 
-    def _compute_vpi(self, node):
-        father=self.child_to_father[node]
-        grandfather=self.child_to_father[father]
+    def _compute_Us(self, node, s):
+        if len(self.children[node])==0:
+            if node.__hash__() in s:
+                return node.buckets
+            else:
+                return [node.meanvalue for b in node.buckets]
+
+        is_max=node.is_max
+
+        child_dist=[]
+        for c in self.children[node]:
+            child_dist.append(self._compute_Us(c,s))
+        ret=[]
+        for i in range(len(node.buckets)):
+            max_or_min=np.NINF
+            for c in child_dist:
+                if is_max:
+                    if max_or_min<c[i]:
+                        max_or_min=c[i]
+                else:
+                    if max_or_min>c[i]:
+                        max_or_min=c[i]
+            ret.append(max_or_min)
+
+        return ret
 
 
-        if self.alpha[grandfather.__hash__()].__hash__() == self.father.__hash__():
-            relevant=self.beta1[grandfather]
-            func = lambda x: relevant.cdf(x) * (relevant.meanvalue - x) + relevant.integral_cdf(x)
-            return func(np.PINF)-func(relevant.meanvalue)
+
+
+    def _compute_bvoi_of_s(self, node, s):
+        alpha=self._compute_Us(self.alpha[node],s)
+        beta=self._compute_Us(self.beta1[node],s)
+        sum=0
+        for i in range(len(alpha)):
+            sum+=max([beta[i]-alpha[i],0])#Only considers the difference beta1-alpha, what about other betas which are not beta1?
+        sum=sum/len(alpha)
+        return sum
+
+
+    def _batch_gather_greedy(self, node):
+        foundone=True
+        s=[]
+        while foundone:
+            foundone=False
+            for l in self.leaves:
+                if l not in s and self._compute_bvoi_of_s(node, [l])>0:#Use BVOI as VPI
+                    s.append(node.__hash__())
+                    foundone=True
+
+
+    def _compute_bvoi_of_child(self, Unode, Ucompare_against, is_alpha=False):
+        sum = 0
+        if not is_alpha:
+            for i in range(len(Unode)):
+                sum += max([Unode[i] - Ucompare_against[i], 0])
+            sum = sum / len(Unode)
+            return sum
         else:
-            relevant = self.alpha[grandfather]
-            func = lambda x: relevant.cdf(x) * (x - relevant.meanvalue) - relevant.integral_cdf(x)
-            return func(relevant.meanvalue) - func(np.NINF)
-        return res
-
-    def _greedy_batch_selection(self):
-        
+            for i in range(len(Unode)):
+                sum += max([Ucompare_against[i] - Unode[i], 0])
+            sum = sum / len(Unode)
+            return sum
 
 
-    def _batchVOI_select(self, node):
+    def _BVOI_select(self, node):
+        if len(self.children[node]) == 1:
+            return self.children[node][0]
+
+        s=self._batch_gather_greedy(node)
+        max=0
+        max_child=None
+        alpha_node=self.alpha[node]
+        beta1_node=self.beta1[node]
+        alpha_Us=self._compute_Us(alpha_node,s)
+        for c in self.children[node]:
+            if c.__hash__() != alpha_node.__hash__():
+                c_bvoi=self._compute_bvoi_of_child(self._compute_Us(c,s),alpha_Us)
+            else:
+                c_bvoi=self._compute_bvoi_of_child(self._compute_Us(beta1_node,s),self._compute_Us(c,s), is_alpha=True)
+            if max<=c_bvoi:
+                max=c_bvoi
+                max_child=c
+        return max_child
+
+
+
+
 
     def choose(self, node):
         "Choose the best successor of node. (Choose a move in the game)"
@@ -95,9 +162,24 @@ class MCTS:
         self.leaves.pop(node.__hash__())
         children = node.find_children()
         self.children[node]=children
+        max=np.NINF
+        max_c=None
+        second_to_max=np.NINF
+        second_to_max_c=None
         for n in children:
-            self.child_to_father[n.__hash__()]=node
             self.leaves[n.__hash__()]=n
+            if n.meanvalue>max:
+                second_to_max=max
+                second_to_max_c=max_c
+                max=n.meanvalue
+                max_c=n
+            else:
+                if n.meanvalue>second_to_max:
+                    second_to_max=n.meanvalue
+                    second_to_max_c=n
+        self.alpha[node]=max_c
+        self.beta1[node]=second_to_max_c
+
 
     def _simulate(self, node):
         "Returns the reward for a random simulation (to completion) of `node`"
