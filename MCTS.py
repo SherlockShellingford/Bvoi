@@ -10,6 +10,8 @@ import math
 import numpy as np
 import random
 from scipy.integrate import quad
+from treelib import Node, Tree
+
 
 class MCTS:
     "Monte Carlo tree searcher. First rollout the tree then choose a move."
@@ -25,12 +27,21 @@ class MCTS:
         self.alpha=dict()
         self.beta1=dict()
         self.mode=mode
-
-
+        self.bvoi_counter=5
+        self.bvoi_freq=5
+        self.last_chosen_by_bvoi=None
+        self.tree_vis=Tree()
+        self.node_to_tag=dict()
+        self.first_time_add=True
 
 
     def _compute_Us(self, node, s):
-        if len(self.children[node])==0:
+        if node.terminal:
+            if node.is_max:
+                return [-1 for b in node.buckets]
+            else:
+                return [1 for b in node.buckets]
+        if self.children.get(node) is None:
             if node.__hash__() in s:
                 return node.buckets
             else:
@@ -43,7 +54,10 @@ class MCTS:
             child_dist.append(self._compute_Us(c,s))
         ret=[]
         for i in range(len(node.buckets)):
-            max_or_min=np.NINF
+            if is_max:
+                max_or_min=np.NINF
+            else:
+                max_or_min=np.PINF
             for c in child_dist:
                 if is_max:
                     if max_or_min<c[i]:
@@ -55,59 +69,80 @@ class MCTS:
 
         return ret
 
+    def gather_leaves(self, node):
+        if self.children.get(node) is None:
+            return [node]
+        ret = []
+        for c in self.children.get(node):
+            ret = ret + self.gather_leaves(c)
+        return ret
 
 
+    def _compute_bvoi_of_child(self, Unode, Ucompare_against, is_alpha=False, is_max=True):
+        sum = 0
+        is_max_coefficent=1
+        if not is_max:
+            is_max_coefficent=-1
 
-    def _compute_bvoi_of_s(self, node, s):
-        alpha=self._compute_Us(self.alpha[node],s)
-        beta=self._compute_Us(self.beta1[node],s)
-        sum=0
-        for i in range(len(alpha)):
-            sum+=max([beta[i]-alpha[i],0])#Only considers the difference beta1-alpha, what about other betas which are not beta1?
-        sum=sum/len(alpha)
-        return sum
+        if not is_alpha:
+            for i in range(len(Unode)):
+                sum += max([is_max_coefficent*(Unode[i] - Ucompare_against[i]), 0])
+            sum = sum / len(Unode)
+            return sum
+        else:
+            for i in range(len(Unode)):
+                sum += max([is_max_coefficent*(Ucompare_against[i] - Unode[i]), 0])
+            sum = sum / len(Unode)
+            return sum
+
 
 
     def _batch_gather_greedy(self, node):
         foundone=True
         s=[]
-        while foundone:
-            foundone=False
-            for l in self.leaves:
-                if l not in s and self._compute_bvoi_of_s(node, [l])>0:#Use BVOI as VPI
-                    s.append(node.__hash__())
-                    foundone=True
+        alpha_node = self.alpha[node]
+        beta1_node = self.beta1[node]
+        alpha_Us = self._compute_Us(alpha_node, [])
+        alpha_leaves = self.gather_leaves(alpha_node)
+        for c in self.children[node]:
+            leaves=alpha_leaves + self.gather_leaves(c)
+            for l in leaves:
+                if l not in s:
+                    if c.__hash__() != alpha_node.__hash__():
+                        c_bvoi = self._compute_bvoi_of_child(self._compute_Us(c, [l.__hash__()]), alpha_Us, node.is_max)
+                    else:
+                        c_bvoi = self._compute_bvoi_of_child(self._compute_Us(beta1_node, [l.__hash__()]), self._compute_Us(c, [l.__hash__()]),
+                                                             is_alpha=True, is_max=node.is_max)
+                    if c_bvoi>0:
+                        s.append(l)
 
+        return s
 
-    def _compute_bvoi_of_child(self, Unode, Ucompare_against, is_alpha=False):
-        sum = 0
-        if not is_alpha:
-            for i in range(len(Unode)):
-                sum += max([Unode[i] - Ucompare_against[i], 0])
-            sum = sum / len(Unode)
-            return sum
-        else:
-            for i in range(len(Unode)):
-                sum += max([Ucompare_against[i] - Unode[i], 0])
-            sum = sum / len(Unode)
-            return sum
 
 
     def _BVOI_select(self, node):
         if len(self.children[node]) == 1:
-            return self.children[node][0]
+            for i in self.children[node]:
+                return i
 
         s=self._batch_gather_greedy(node)
+        if len(s) == 0: #TODO ADD THIS!!!!!
+        #if True: #TODO REMOVE THIS!!!!!
+            return self.alpha[node]
+        print("Kook")
         max=0
         max_child=None
         alpha_node=self.alpha[node]
         beta1_node=self.beta1[node]
         alpha_Us=self._compute_Us(alpha_node,s)
+        beta1_Us = self._compute_Us(beta1_node, s)
+
         for c in self.children[node]:
+            child_Us=self._compute_Us(c,s)
             if c.__hash__() != alpha_node.__hash__():
-                c_bvoi=self._compute_bvoi_of_child(self._compute_Us(c,s),alpha_Us)
+                c_bvoi=self._compute_bvoi_of_child(child_Us,alpha_Us, is_max=node.is_max)
             else:
-                c_bvoi=self._compute_bvoi_of_child(self._compute_Us(beta1_node,s),self._compute_Us(c,s), is_alpha=True)
+                c_bvoi=self._compute_bvoi_of_child(beta1_Us,child_Us, is_alpha=True, is_max=node.is_max)
             if max<=c_bvoi:
                 max=c_bvoi
                 max_child=c
@@ -126,15 +161,36 @@ class MCTS:
             return node.find_random_child()
 
         def score(n):
-            if self.N[n] == 0:
+            #return self.N[n] #TODO THIS IS A DIFFERENT KIND OF MEASUREMENT, YOU CAN TRY AND REMOVE IT
+            if self.N[n] < 10:
                 return float("-inf")  # avoid unseen moves
             return self.Q[n] / self.N[n]  # average reward
+
+        for c in self.children[node]:
+            print(c.tup)
+            print(self.Q[c])
+            print(self.N[c])
+            print(c.meanvalue)
+            x=self._compute_Us(c,[])
+            print(x)
+            #if x[0]>2:
+            #    print("Chikachika")
+            #    while True:
+            #        self._compute_Us(c, [])
+        #self.tree_vis.show()
+
 
         return max(self.children[node], key=score)
 
 
     def do_rollout(self, node):
+        #Visualazation
+        if self.first_time_add:
+            self.first_time_add=False
+            self.node_to_tag[node]=''.join([str(i) for i in node.tup])
+            self.tree_vis.create_node(str(node.meanvalue),''.join([str(i) for i in node.tup]))
         "Make the tree one layer better. (Train for one iteration.)"
+        #Visualazation
         path = self._select(node)
         leaf = path[-1]
         self._expand(leaf)
@@ -144,6 +200,7 @@ class MCTS:
     def _select(self, node):
         "Find an unexplored descendent of `node`"
         path = []
+        first=True
         while True:
             path.append(node)
             if node not in self.children or not self.children[node]:
@@ -155,30 +212,54 @@ class MCTS:
                 path.append(n)
                 return path
             if self.mode == "uct":
-                node = self._uct_select(node)  # descend a layer deeper
+                node = self._uct_select(node)
             if self.mode == "bvoi-greedy":
-                node = self._BVOI_select(node)
+                if first:
+                    if self.bvoi_counter==self.bvoi_freq:
+                        self.bvoi_counter=0
+                        node = self._BVOI_select(node)
+                        self.last_chosen_by_bvoi=node
+                    else:
+                        self.bvoi_counter+=1
+                        node = self.last_chosen_by_bvoi
+                    first=False
+                else:
+                    node = self._uct_select(node)
+
 
     def _expand(self, node):
         "Update the `children` dict with the children of `node`"
         if node in self.children:
             return  # already expanded
-        self.leaves.pop(node.__hash__())
-        children = node.find_children()
+        if self.mode == "bvoi-greedy":
+            children = node.find_children_bvoi()
+        else:
+            children = node.find_children()
+
         self.children[node]=children
-        max=np.NINF
-        max_c=None
-        second_to_max=np.NINF
-        second_to_max_c=None
+        is_max=node.is_max
+        if is_max:
+            max=np.NINF
+            max_c=None
+            second_to_max=np.NINF
+            second_to_max_c=None
+        else:
+            max = np.PINF
+            max_c = None
+            second_to_max = np.PINF
+            second_to_max_c = None
         for n in children:
-            self.leaves[n.__hash__()]=n
-            if n.meanvalue>max:
+            # Visualazation
+#            self.node_to_tag[n]=self.node_to_tag[node] + ''.join([str(i) for i in n.tup])
+#            self.tree_vis.create_node(str(n.meanvalue),self.node_to_tag[node] + ''.join([str(i) for i in n.tup]),parent=self.node_to_tag[node])
+            # Visualazation
+            if (is_max and n.meanvalue>max)  or (not is_max and n.meanvalue<max):
                 second_to_max=max
                 second_to_max_c=max_c
                 max=n.meanvalue
                 max_c=n
             else:
-                if n.meanvalue>second_to_max:
+                if (is_max and n.meanvalue>second_to_max) or (not is_max and n.meanvalue<second_to_max):
                     second_to_max=n.meanvalue
                     second_to_max_c=n
         self.alpha[node]=max_c
@@ -259,6 +340,9 @@ class Node():
     def __hash__(self):
         "Nodes must be hashable"
         return self.hash
+
+    def __str__(self):
+        return ''.join([str(i) for i in self.tup])
 
     @abstractmethod
     def __eq__(node1, node2):

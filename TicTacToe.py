@@ -22,6 +22,9 @@ import math
 from scipy.stats import norm
 from alphazero.NNet import NNetWrapper
 
+
+
+
 _TTTB = namedtuple("TicTacToeBoard", "tup turn winner terminal")
 
 states=dict()
@@ -32,7 +35,7 @@ alphazero_agent=None
 
 def load_tictactoe_alphazero():
     alphazero_agent = NNetWrapper()
-    alphazero_agent.load_checkpoint('./pretrained_models/tictactoe/keras','best-25eps-25sim-10epch.pth.tar')
+    alphazero_agent.load_checkpoint('./pretrained_models','best-25eps-25sim-10epch.pth.tar')
 
 
 
@@ -47,7 +50,7 @@ class TicTacToeBoard(Node):
 
     def __init__(self, max, tup, turn, winner, terminal, meanvalue, depth):
         standard_derv=(9-depth)*0.3/9
-        self.max=max
+        self.is_max=max
         self.tup=tup
         self.turn=turn
         self.winner=winner
@@ -59,7 +62,7 @@ class TicTacToeBoard(Node):
         self.buckets=[]
         for i in np.linspace(0,1,15):
             self.buckets.append(norm.ppf(i,loc=meanvalue, scale=standard_derv))
-
+        self.buckets=self.buckets[1:-1]
         def dist(x):
             if self.buckets[0]>x:
                 return self.buckets[0]
@@ -86,19 +89,28 @@ class TicTacToeBoard(Node):
             return set()
         # Otherwise, you can make a move in each of the empty spots
         return {
-            board.make_move(i) for i, value in enumerate(board.tup) if value is None
+            board.make_move(i) for i, value in enumerate(board.tup) if value == 0
         }
+
+    def find_children_bvoi(board):
+        if board.terminal:  # If the game is finished then no moves can be made
+            return set()
+        # Otherwise, you can make a move in each of the empty spots
+        return {
+            board.make_move_bvoi(i) for i, value in enumerate(board.tup) if value == 0
+        }
+
 
     def find_random_child(board):
         if board.terminal:
             return None  # If the game is finished then no moves can be made
-        empty_spots = [i for i, value in enumerate(board.tup) if value is None]
+        empty_spots = [i for i, value in enumerate(board.tup) if value == 0]
         return board.make_move(choice(empty_spots))
 
     def find_random_child_bvoi(board):
         if board.terminal:
             return None  # If the game is finished then no moves can be made
-        empty_spots = [i for i, value in enumerate(board.tup) if value is None]
+        empty_spots = [i for i, value in enumerate(board.tup) if value == 0]
         return board.make_move_bvoi(choice(empty_spots))
 
     def reward(board):
@@ -124,8 +136,8 @@ class TicTacToeBoard(Node):
             return state
         turn = not board.turn
         winner = _find_winner(tup)
-        is_terminal = (winner is not None) or not any(v is None for v in tup)
-        ret = TicTacToeBoard(not board.max, tup, turn, winner, is_terminal, 0, board.depth)
+        is_terminal = (winner is not None) or not any(v == 0 for v in tup)
+        ret = TicTacToeBoard(not board.is_max, tup, turn, winner, is_terminal, 0, board.depth)
         states[tup] = ret
         return ret
 
@@ -136,18 +148,17 @@ class TicTacToeBoard(Node):
             return state
         turn = not board.turn
         winner = _find_winner(tup)
-        is_terminal = (winner is not None) or not any(v is None for v in tup)
-        original_mcts_ret = states.get(tup)
-        print("Zura")
-        print(original_mcts_ret.tup)
-        value_of_original = previous_tree.Q[original_mcts_ret] / previous_tree.N[original_mcts_ret]
-        ret = TicTacToeBoard(not board.max, tup, turn, winner, is_terminal, value_of_original , board.depth)
+        is_terminal = (winner is not None) or not any(v == 0 for v in tup)
+        X = np.asarray(tup).astype('float32')
+        X = np.reshape(X, (3, 3,))
+        meanvalue = alphazero_agent.predict(X)[1][0]# 0 is pi and 1 is v
+        ret = TicTacToeBoard(not board.is_max, tup, turn, winner, is_terminal, meanvalue , board.depth)
         states[tup] = ret
         return ret
 
 
     def to_pretty_string(board):
-        to_char = lambda v: ("X" if v is True else ("O" if v is False else " "))
+        to_char = lambda v: ("X" if v == 1 else ("O" if v == -1 else " "))
         rows = [
             [to_char(board.tup[3 * row + col]) for col in range(3)] for row in range(3)
         ]
@@ -166,15 +177,19 @@ def play_game(mode="uct"):
         #row_col = input("enter row,col: ")
         #row, col = map(int, row_col.split(","))
         #index = 3 * (row - 1) + (col - 1)
-        #if board.tup[index] is not None:
-        #    raise RuntimeError("Invalid move")
+        #if board.tup[index] != 0:
+        #    print("Invalid move")
+        #    row_col = input("enter row,col: ")
+        #    row, col = map(int, row_col.split(","))
+        #    index = 3 * (row - 1) + (col - 1)
         #board = board.make_move(index)
         #print(board.to_pretty_string())
         #if board.terminal:
         #    break
         # You can train as you go, or only at the beginning.
         # Here, we train as we go, doing fifty rollouts each turn.
-        for _ in range(200):
+        for i in range(200):
+            print("Lap", i)
             tree.do_rollout(board)
         board = tree.choose(board)
         print(board.to_pretty_string())
@@ -196,21 +211,33 @@ def _find_winner(tup):
     "Returns None if no winner, True if X wins, False if O wins"
     for i1, i2, i3 in _winning_combos():
         v1, v2, v3 = tup[i1], tup[i2], tup[i3]
-        if -1 is v1 is v2 is v3:
+        if -1 == v1 == v2 == v3:
             return False
-        if 1 is v1 is v2 is v3:
+        if 1 == v1 == v2 == v3:
             return True
     return None
 
 
 def new_tic_tac_toe_board():
-    return TicTacToeBoard(True, (None,) * 9, True, None, False,0, 0)
+    return TicTacToeBoard(True, (0,) * 9, True, None, False,0, 0)
 
 
 if __name__ == "__main__":
-    tree = play_game()
-    for key in tree.N.keys():
-        print(key.tup, tree.N[key])
-    previous_tree = tree
+    alphazero_agent = NNetWrapper()
+    alphazero_agent.load_checkpoint('./pretrained_models', 'best.pth.tar')
+    X=np.asarray([1,0,0,    0,-1,0,    0,0,0,]).astype('float32')
+    X=np.reshape(X, (3,3,))
+    print("XXXXX", alphazero_agent.predict(X)[1])
+    X = np.asarray([1, -1, 1,     0, -1, 0,      0, 0, 0, ]).astype('float32')
+    X = np.reshape(X, (3, 3,))
+    print("YYYYY", alphazero_agent.predict(X)[1])
+    X = np.asarray([1, 0, 0, -1, -1, 0, -1, 1, 1, ]).astype('float32')
+    X = np.reshape(X, (3, 3,))
+    print("ZZZZZ", alphazero_agent.predict(X)[1])
+    #tree = play_game()
+    import time
 
+    start = time.time()
     play_game(mode="bvoi-greedy")
+    end = time.time()
+    print("Time:", start-end)
