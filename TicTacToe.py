@@ -101,6 +101,7 @@ class TicTacToeBoard(Node):
         }
 
 
+
     def find_random_child(board):
         if board.terminal:
             return None  # If the game is finished then no moves can be made
