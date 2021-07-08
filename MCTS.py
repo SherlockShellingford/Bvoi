@@ -129,7 +129,6 @@ class MCTS:
         if len(s) == 0: #TODO ADD THIS!!!!!
         #if True: #TODO REMOVE THIS!!!!!
             return self.alpha[node]
-        print("Kook")
         max=0
         max_child=None
         alpha_node=self.alpha[node]

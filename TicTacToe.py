@@ -21,8 +21,8 @@ import numpy as np
 import math
 from scipy.stats import norm
 from alphazero.NNet import NNetWrapper
-
-
+from MCTSaz import MCTSaz
+from game.TicTacToeGame import TicTacToeGame
 
 
 _TTTB = namedtuple("TicTacToeBoard", "tup turn winner terminal")
@@ -149,9 +149,17 @@ class TicTacToeBoard(Node):
         turn = not board.turn
         winner = _find_winner(tup)
         is_terminal = (winner is not None) or not any(v == 0 for v in tup)
-        X = np.asarray(tup).astype('float32')
+        if not board.is_max:
+            tup2=tup
+        else:
+            tup2=[-1*i for i in tup]
+
+        X = np.asarray(tup2).astype('float32')
         X = np.reshape(X, (3, 3,))
+
         meanvalue = alphazero_agent.predict(X)[1][0]# 0 is pi and 1 is v
+        if not not board.is_max:
+            meanvalue = -meanvalue
         ret = TicTacToeBoard(not board.is_max, tup, turn, winner, is_terminal, meanvalue , board.depth)
         states[tup] = ret
         return ret
@@ -172,6 +180,10 @@ class TicTacToeBoard(Node):
 def play_game(mode="uct"):
     board = new_tic_tac_toe_board()
     tree = MCTS(board, mode=mode)
+    game=TicTacToeGame()
+    rival=MCTSaz(game,alphazero_agent)
+    prob, v = alphazero_agent.predict(np.asarray(board.tup).astype('float32').reshape((3, 3)))
+
     print(board.to_pretty_string())
     while True:
         #row_col = input("enter row,col: ")
@@ -195,7 +207,21 @@ def play_game(mode="uct"):
         print(board.to_pretty_string())
         if board.terminal:
             break
-    return tree
+        #prob=rival.getActionProb(np.asarray(board.tup).astype('float32').reshape((3,3)))
+        #maxi=-1
+        #maxx=-1
+        #for i in range(len(prob)):
+        #    if prob[i]>maxx:
+        #        maxi=i
+        #        maxx=prob[i]
+        #print(prob)
+        #print("Rival chose:", maxi)
+        #board=board.make_move_bvoi(maxi)
+        #print(board.to_pretty_string())
+
+        #if board.terminal:
+        #    break
+    return board
 
 
 def _winning_combos():
@@ -223,8 +249,9 @@ def new_tic_tac_toe_board():
 
 
 if __name__ == "__main__":
+
     alphazero_agent = NNetWrapper()
-    alphazero_agent.load_checkpoint('./pretrained_models', 'best.pth.tar')
+    alphazero_agent.load_checkpoint('./pretrained_models/alternative', 'best-25eps-25sim-10epch.pth.tar')
     X=np.asarray([1,0,0,    0,-1,0,    0,0,0,]).astype('float32')
     X=np.reshape(X, (3,3,))
     print("XXXXX", alphazero_agent.predict(X)[1])
@@ -237,7 +264,17 @@ if __name__ == "__main__":
     #tree = play_game()
     import time
 
+
     start = time.time()
-    play_game(mode="bvoi-greedy")
+    sum = 10
+    for i in range(0,5):
+        fail=0
+        board=play_game(mode="bvoi-greedy")
+        for x in board.tup:
+            if x == 0:
+                fail=1
+        sum=sum-fail
+    print("We got ", sum)
+    print("tie out of 5")
     end = time.time()
     print("Time:", start-end)
