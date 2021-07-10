@@ -14,6 +14,7 @@ X - -
 corrresponds to this tuple:
 (False, None, True, False, True, None, True, None, None)
 """
+import copy
 from collections import namedtuple
 from random import choice, getrandbits
 from MCTS import MCTS, Node
@@ -138,7 +139,7 @@ class TicTacToeBoard(Node):
         turn = not board.turn
         winner = _find_winner(tup)
         is_terminal = (winner is not None) or not any(v == 0 for v in tup)
-        ret = TicTacToeBoard(not board.is_max, tup, turn, winner, is_terminal, 0, board.depth)
+        ret = TicTacToeBoard(not board.is_max, tup, turn, winner, is_terminal, 0, board.depth + 1)
         states[tup] = ret
         return ret
 
@@ -161,7 +162,7 @@ class TicTacToeBoard(Node):
         meanvalue = alphazero_agent.predict(X)[1][0]# 0 is pi and 1 is v
         if not not board.is_max:
             meanvalue = -meanvalue
-        ret = TicTacToeBoard(not board.is_max, tup, turn, winner, is_terminal, meanvalue , board.depth)
+        ret = TicTacToeBoard(not board.is_max, tup, turn, winner, is_terminal, meanvalue , board.depth + 1)
         states[tup] = ret
         return ret
 
@@ -208,20 +209,23 @@ def play_game(mode="uct"):
         print(board.to_pretty_string())
         if board.terminal:
             break
-        #prob=rival.getActionProb(np.asarray(board.tup).astype('float32').reshape((3,3)))
-        #maxi=-1
-        #maxx=-1
-        #for i in range(len(prob)):
-        #    if prob[i]>maxx:
-        #        maxi=i
-        #        maxx=prob[i]
-        #print(prob)
-        #print("Rival chose:", maxi)
-        #board=board.make_move_bvoi(maxi)
-        #print(board.to_pretty_string())
+        tup2=[]
+        for x in board.tup:
+            tup2.append(-x)
+        prob=rival.getActionProb(np.asarray(tup2).astype('float32').reshape((3,3)))
+        maxi=-1
+        maxx=-1
+        for i in range(len(prob)):
+            if prob[i]>maxx:
+                maxi=i
+                maxx=prob[i]
+        print(prob)
+        print("Rival chose:", maxi)
+        board=board.make_move_bvoi(maxi)
+        print(board.to_pretty_string())
 
-        #if board.terminal:
-        #    break
+        if board.terminal:
+            break
     return board
 
 

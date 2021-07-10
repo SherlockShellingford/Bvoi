@@ -183,13 +183,7 @@ class MCTS:
 
 
     def do_rollout(self, node):
-        #Visualazation
-        if self.first_time_add:
-            self.first_time_add=False
-            self.node_to_tag[node]=''.join([str(i) for i in node.tup])
-            self.tree_vis.create_node(str(node.meanvalue),''.join([str(i) for i in node.tup]))
-        "Make the tree one layer better. (Train for one iteration.)"
-        #Visualazation
+
         path = self._select(node)
         leaf = path[-1]
         self._expand(leaf)
