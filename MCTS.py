@@ -16,7 +16,7 @@ from treelib import Node, Tree
 class MCTS:
     "Monte Carlo tree searcher. First rollout the tree then choose a move."
 
-    def __init__(self, root, exploration_weight=1, mode="uct"):
+    def __init__(self, root, exploration_weight=1, mode="uct", distribution_mode="sample"):
         self.Q = defaultdict(int)  # total reward of each node
         self.N = defaultdict(int)  # total visit count for each node
         self.children = dict()  # children of each node
@@ -27,6 +27,7 @@ class MCTS:
         self.alpha=dict()
         self.beta1=dict()
         self.mode=mode
+        self.distribution_mode=distribution_mode
         self.bvoi_counter=5
         self.bvoi_freq=5
         self.last_chosen_by_bvoi=None
@@ -186,8 +187,10 @@ class MCTS:
 
         path = self._select(node)
         leaf = path[-1]
+        print("Starting to expand")
         self._expand(leaf)
-        reward = self._simulate(leaf)
+        print("Finished expanding")
+        reward = self.simulate(leaf)
         self._backpropagate(path, reward)
 
     def _select(self, node):
@@ -225,7 +228,7 @@ class MCTS:
         if node in self.children:
             return  # already expanded
         if self.mode == "bvoi-greedy":
-            children = node.find_children_bvoi()
+            children = node.find_children_bvoi(distribution_mode=self.distribution_mode)
         else:
             children = node.find_children()
 
@@ -259,18 +262,22 @@ class MCTS:
         self.beta1[node]=second_to_max_c
 
 
-    def _simulate(self, node):
+    def simulate(self, node):
         "Returns the reward for a random simulation (to completion) of `node`"
+        #print("Begin simulating!")
+        #print(node.is_terminal())
+        #print(node.get_legal_moves(1 if node.is_max else -1))
         invert_reward = True
         while True:
             if node.is_terminal():
                 reward = node.reward()
                 return 1 - reward if invert_reward else reward
             if self.mode!="uct":
-                node = node.find_random_child_bvoi()
+                node = node.find_random_child_bvoi(distribution_mode="none")
             else:
                 node = node.find_random_child()
-
+                #print(node.is_terminal())
+                #print(node.get_legal_moves(1 if node.is_max else -1))
             invert_reward = not invert_reward
 
     def _backpropagate(self, path, reward):

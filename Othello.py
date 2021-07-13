@@ -173,12 +173,12 @@ class OthelloBoard(Node):
             board.make_move(i) for i in board.get_legal_moves(1 if board.is_max else -1)
         }
 
-    def find_children_bvoi(board):
+    def find_children_bvoi(board, distribution_mode="sample"):
         if board.terminal:  # If the game is finished then no moves can be made
             return set()
         # Otherwise, you can make a move in each of the empty spots
         return {
-            board.make_move_bvoi(i) for i in board.get_legal_moves(1 if board.is_max else -1)
+            board.make_move_bvoi(i, distribution_mode=distribution_mode) for i in board.get_legal_moves(1 if board.is_max else -1)
         }
 
 
@@ -189,11 +189,12 @@ class OthelloBoard(Node):
         empty_spots = board.get_legal_moves(1 if board.is_max else -1)
         return board.make_move(choice(empty_spots))
 
-    def find_random_child_bvoi(board):
+    def find_random_child_bvoi(board, distribution_mode="sample"):
         if board.terminal:
             return None  # If the game is finished then no moves can be made
         empty_spots = board.get_legal_moves(1 if board.is_max else -1)
-        return board.make_move_bvoi(choice(empty_spots))
+        return board.make_move_bvoi(choice(empty_spots), distribution_mode=distribution_mode)
+
 
 
     def make_move(board, index):
@@ -204,34 +205,75 @@ class OthelloBoard(Node):
             return state
         turn = not board.turn
         ret = OthelloBoard(not board.is_max, tup, turn, None, None, 0, board.depth + 1)
-        ret.winner = _find_winner(ret)
+        ret.terminal = len(ret.get_legal_moves(1 if ret.is_max else -1)) == 0
+        if ret.terminal:
+            ret.winner = _find_winner(ret)
+        else:
+            ret.winner = None
 
-        ret.terminal = (ret.winner is not None)
+
 
         states[flattup] = ret
         return ret
 
-    def make_move_bvoi(board, index):
+    def make_move_bvoi(board, index, distribution_mode="sample"):
         tup = board.execute_move((int(index / 6), index % 6), 1 if board.is_max else -1)
         flattup = tuple(tup[0] + tup[1] + tup[2] + tup[3] + tup[4] + tup[5])
         state=states_cache_bvoi.get(flattup)
         if state is not None:
             return state
         turn = not board.turn
-        if not board.is_max:
-            tup2=tup
-        else:
-            tup2=[-1*i for i in tup]
+        if distribution_mode=="none":
+            ret = OthelloBoard(not board.is_max, tup, turn, None, None, 0, board.depth + 1)
+            ret.terminal = len(ret.get_legal_moves(1 if ret.is_max else -1)) == 0
+            if ret.terminal:
+                ret.winner = _find_winner(ret)
+            else:
+                ret.winner = None
+            return ret
 
-        X = np.asarray(tup2).astype('float32')
-        X = np.reshape(X, (6, 6,))
+        if distribution_mode=="NN":
+            if not board.is_max:
+                tup2=deepcopy(tup)
+            else:
+                tup2=deepcopy(tup)
+                for x in range(6):
+                    for y in range(6):
+                        tup2[x][y]=-tup2[x][y]
 
-        meanvalue = alphazero_agent.predict(X)[1][0]# 0 is pi and 1 is v
-        if not not board.is_max:
-            meanvalue = -meanvalue
-        ret = OthelloBoard(not board.is_max, tup, turn, None, None, meanvalue , board.depth + 1)
-        ret.winner = _find_winner(tup)
-        ret.terminal = (ret.winner is not None)
+            X = np.asarray(tup2).astype('float32')
+            X = np.reshape(X, (6, 6,))
+
+            meanvalue = alphazero_agent.predict(X)[1][0]# 0 is pi and 1 is v
+            if not not board.is_max:
+                meanvalue = -meanvalue
+            ret = OthelloBoard(not board.is_max, tup, turn, None, None, meanvalue, board.depth + 1)
+            ret.terminal = len(ret.get_legal_moves(1 if ret.is_max else -1)) == 0
+            if ret.terminal:
+                ret.winner = _find_winner(ret)
+            else:
+                ret.winner=None
+        if distribution_mode=="sample":
+            to_simulate = OthelloBoard(not board.is_max, tup, turn, None, None, 0, board.depth + 1)
+            terminal = len(to_simulate.get_legal_moves(1 if to_simulate.is_max else -1)) == 0
+            if terminal:
+                winner = _find_winner(to_simulate)
+            else:
+                winner = None
+
+            to_simulate.winner = winner
+            to_simulate.terminal = terminal
+            mcts=MCTS(to_simulate)
+            sum=0
+            num_sims=35
+            for i in range(num_sims):
+                sum += mcts.simulate(to_simulate)
+            meanvalue = sum / num_sims
+            ret = OthelloBoard(not board.is_max, tup, turn, None, None, meanvalue, board.depth + 1)
+            ret.winner = winner
+            ret.terminal = terminal
+
+
         states[flattup] = ret
         return ret
 
@@ -280,17 +322,16 @@ class OthelloBoard(Node):
             move = (move[0]+direction[0],move[1]+direction[1])
 
 def _find_winner(board : OthelloBoard):
-    if len(board.get_legal_moves(1 if board.is_max else -1)) == 0:
-        sum = 0
-        for x in range(board.n):
-            for y in range(board.n):
-                sum+=board.tup66[x][y]
-        if sum < 0:
-            return 0
-        if sum > 0:
-            return 1
-        return 0.5
-    return None
+
+    sum = 0
+    for x in range(board.n):
+        for y in range(board.n):
+            sum+=board.tup66[x][y]
+    if sum < 0:
+        return 0
+    if sum > 0:
+        return 1
+    return 0.5
 
 
 
@@ -320,58 +361,98 @@ def legal_moves_test():
     print("Black-1:", oo.get_legal_moves(-1))
 
 
+def do_turn_alphazeroagent(mcts, board):
+    enemy_pov = []
+    for x in range(6):
+        row = []
+        for y in range(6):
+            row.append(-board.tup[x][y])
+        enemy_pov.append(row)
+
+    prob = mcts.getActionProb(np.asarray(enemy_pov).astype('float32').reshape((6, 6)))
+    maxi = -1
+    maxx = -1
+    for i in range(len(prob)):
+        if prob[i] > maxx:
+            maxi = i
+            maxx = prob[i]
+    print(prob)
+    print("Rival chose:", maxi)
+    board = board.make_move_bvoi(maxi)
+    return board
 
 
+def do_turn_mcts(tree, board):
+    for i in range(30):
+        print("Lap", i)
+        tree.do_rollout(board)
+    board = tree.choose(board)
+    return board
 
-
-
-
-def play_game(mode="uct"):
+def play_game(mode="uct", distribution_mode="sample"):
     board = new_othello_board()
-    tree = MCTS(board, mode=mode)
+    tree = MCTS(board, mode=mode, distribution_mode=distribution_mode)
+    tree_uct = MCTS(board, mode="uct")
     game=OthelloGame(6)
     rival=MCTSaz(game,alphazero_agent)
-
     print(board.to_pretty_string())
+
     while True:
-        #row_col = input("enter row,col: ")
-        #row, col = map(int, row_col.split(","))
-        #index = 3 * (row - 1) + (col - 1)
-        #if board.tup[index] != 0:
-        #    print("Invalid move")
-        #    row_col = input("enter row,col: ")
-        #    row, col = map(int, row_col.split(","))
-        #    index = 3 * (row - 1) + (col - 1)
-        #board = board.make_move(index)
-        #print(board.to_pretty_string())
-        #if board.terminal:
-        #    break
-        # You can train as you go, or only at the beginning.
-        # Here, we train as we go, doing fifty rollouts each turn.
-        for i in range(200):
-            print("Lap", i)
-            tree.do_rollout(board)
-        board = tree.choose(board)
+
+        board = do_turn_mcts(tree, board)
+
         print(board.to_pretty_string())
+
         if board.terminal:
             break
-        enemy_pov=[]
-        for x in range(6):
-            row=[]
-            for y in range(6):
-                row.append(-board.tup[x][y])
-            enemy_pov.append(row)
 
-        prob=rival.getActionProb(np.asarray(enemy_pov).astype('float32').reshape((6,6)))
-        maxi=-1
-        maxx=-1
-        for i in range(len(prob)):
-            if prob[i]>maxx:
-                maxi=i
-                maxx=prob[i]
-        print(prob)
-        print("Rival chose:", maxi)
-        board=board.make_move(maxi)
+        tup2=[]
+        for i in range(6):
+            row = []
+            for j in range(6):
+                row.append(-board.tup[i][j])
+            tup2.append(row)
+
+        board = OthelloBoard(not board.is_max, tup2, not board.turn, board.winner, board.terminal, 0, board.depth)
+
+
+        board = do_turn_mcts(tree_uct, board)
+
+        print(board.to_pretty_string())
+
+        if board.terminal:
+            break
+
+        tup2 = []
+        for i in range(6):
+            row = []
+            for j in range(6):
+                row.append(-board.tup[i][j])
+            tup2.append(row)
+        board = OthelloBoard(not board.is_max, tup2, not board.turn, board.winner, board.terminal, 0, board.depth)
+
+    return board
+
+
+def play_game_opposite(mode="uct", distribution_mode="sample"):
+    board = new_othello_board()
+    tree = MCTS(board, mode=mode, distribution_mode=distribution_mode)
+    tree_uct = MCTS(board, mode="uct")
+    game = OthelloGame(6)
+    rival = MCTSaz(game, alphazero_agent)
+    print(board.to_pretty_string())
+
+    while True:
+
+        board = do_turn_mcts(tree_uct, board)
+
+        print(board.to_pretty_string())
+
+        if board.terminal:
+            break
+
+        board = do_turn_mcts(tree, board)
+
         print(board.to_pretty_string())
 
         if board.terminal:
@@ -381,28 +462,74 @@ def play_game(mode="uct"):
 
 
 
-
-
 if __name__ == "__main__":
-    alphazero_agent = NNetWrapper()
-    alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
+    #alphazero_agent = NNetWrapper()
+    #alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
     #tree = play_game()
     import time
     legal_moves_test()
+
+    #real_best = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0], [0, -1, 1, 1, -1, 0], [0, 1, 1, -1, 1, 0], [0, 0, 1, 1, 0, 0],
+    # [0, 0, 1, 0, 0, 0]]
+
+    #best = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0], [1, 1, 1, 1, -1, 0], [0, 1, -1, -1, 1, 0], [0, 0, -1, -1, 0, 0],
+    # [0, 0, 0, 0, 0, 0]]
+
+    #father = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0], [0, -1, -1, 1, -1, 0], [0, 1, -1, -1, 1, 0], [0, 0, -1, -1, 0, 0],
+    #             [0, 0, 0, 0, 0, 0]]
+
+    #one = [[1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1],
+    #          [1, 1, 1, 1, 1, 1]]
+
+    #X = np.asarray(one).astype('float32')
+    #X = np.reshape(X, (6, 6,))
+
+    #meanvalue_complete = alphazero_agent.predict(X)[1][0]  # 0 is pi and 1 is v
+
+    #X = np.asarray(father).astype('float32')
+    #X = np.reshape(X, (6, 6,))
+
+    #pi, v = alphazero_agent.predict(X)  # 0 is pi and 1 is v
+
+    #X = np.asarray(real_best).astype('float32')
+    #X = np.reshape(X, (6, 6,))
+
+    #meanvalue = alphazero_agent.predict(X)[1][0]  # 0 is pi and 1 is v
+
+    #o = OthelloBoard(True, father, True, None, None, 0, 1)
+
+    #o.make_move_bvoi(32)
+    #o.make_move_bvoi(12)
+
+
 
     start = time.time()
     sum = 10
     win_sum = 0
     for i in range(0,5):
         fail=0
-        board=play_game(mode="uct")
+        board=play_game(mode="bvoi-greedy")
         win_sum += board.winner
         for x in board.tup:
             if x == 0:
                 fail=1
         sum=sum-fail
-    print("We got ", sum)
-    print("tie out of 1")
+
+
+
+    print("Win_sum:", win_sum)
+    win_sum = 0
+    end = time.time()
+    print("Time:", start-end)
+    for i in range(0,5):
+        fail=0
+        board=play_game_opposite(mode="bvoi-greedy", distribution_mode="sample")
+        win_sum += board.winner
+        for x in board.tup:
+            if x == 0:
+                fail=1
+        sum=sum-fail
+
     print("Win_sum:", win_sum)
     end = time.time()
     print("Time:", start-end)
