@@ -11,7 +11,8 @@ import numpy as np
 import random
 from scipy.integrate import quad
 from treelib import Node, Tree
-
+from CVIBES.PrioritizedItem import PrioritizedItem
+from queue import PriorityQueue
 
 class MCTS:
     "Monte Carlo tree searcher. First rollout the tree then choose a move."
@@ -34,7 +35,7 @@ class MCTS:
         self.tree_vis=Tree()
         self.node_to_tag=dict()
         self.first_time_add=True
-
+        self.conspiracy_queue = []
 
     def _compute_Us(self, node, s):
         if node.terminal:
@@ -79,6 +80,7 @@ class MCTS:
         return ret
 
 
+
     def _compute_bvoi_of_child(self, Unode, Ucompare_against, is_alpha=False, is_max=True):
         sum = 0
         is_max_coefficent=1
@@ -95,6 +97,129 @@ class MCTS:
                 sum += max([is_max_coefficent*(Ucompare_against[i] - Unode[i]), 0])
             sum = sum / len(Unode)
             return sum
+
+    def chance_for_dist_biggersmaller_than_val(self, dist, val, bigger_mode=True):
+        count=0
+        len_dist=len(dist)
+        for i in range(len_dist):
+            if dist[i]>val:
+                break
+        if not bigger_mode:
+            return count/len_dist
+        return (len_dist-count)/len_dist
+
+
+    def _S_gather_loop_CVIBES(self, open_list, v, prob_table, prob_of_root):
+        S = []
+        while len(open_list) > 0:
+            node = open_list.pop()
+            if self.children.get(node) is None:
+                S.append(node)
+            else:
+                for c in self.children(node):
+                    if prob_table[c.__hash__(), v] == prob_of_root:
+                        open_list.append(c)
+        return S
+
+
+    def _store_probabilities(self, node, s, table, v, bigger_mode=True):
+        if node.terminal:
+            if node.is_max:
+                return [-1 for b in node.buckets]
+            else:
+                return [1 for b in node.buckets]
+        if self.children.get(node) is None:
+            if node.__hash__() in s:
+                return node.buckets
+            else:
+                return [node.meanvalue for b in node.buckets]
+        is_max=node.is_max
+        child_dist=[]
+        for c in self.children[node]:
+            Us_c = self._store_probabilities(c, s, table, v, bigger_mode=bigger_mode)
+            child_dist.append(Us_c)
+        ret=[]
+        for i in range(len(node.buckets)):
+            if is_max:
+                max_or_min=np.NINF
+            else:
+                max_or_min=np.PINF
+            for c in child_dist:
+                if is_max:
+                    if max_or_min<c[i]:
+                        max_or_min=c[i]
+                else:
+                    if max_or_min>c[i]:
+                        max_or_min=c[i]
+            ret.append(max_or_min)
+
+        table[node.__hash__(), v] = self.chance_for_dist_biggersmaller_than_val(ret, v, bigger_mode=bigger_mode)
+        return ret
+
+
+
+
+    def _find_k_best_VPI(self, s, k, alpha, c, is_alpha_children):
+        queue = PriorityQueue(maxsize = k)
+        for leaf in s:
+            PrioritizedItem(self._compute_bvoi_of_child(c,alpha,is_alpha = is_alpha_children,))
+            queue.put()
+
+    def _conspiracy_choice(self, node):
+
+        if len(self.conspiracy_queue) > 0:
+            return self.conspiracy_queue.pop()
+
+        #Lines 1-5
+        alpha_node = self.alpha[node]
+        alpha_mean = alpha_node.mean_value
+        coff_stash = [1.05, 1, 0.95, 0.9, 0.8]
+        v_stash = []
+        for coff in coff_stash:
+            v_stash.append(coff * alpha_mean)
+
+
+        prob_dict=dict()
+
+        for c in self.children[node]:
+            for V in v_stash:
+                s = self.gather_leaves(c)
+                if c.__hash__() == alpha_node.__hash__():
+                    self._store_probabilities(c, s, prob_dict,V,bigger_mode=False)
+                else:
+                    self._store_probabilities(c, s, prob_dict,V,bigger_mode=True)
+        #Line 6
+        max=0
+        maxV=None
+        maxV_tag=None
+        max_c=None
+        for i in range(len(v_stash)):
+            for j in range(i + 1, len(v_stash)):
+                for c in self.children[node]:
+                    if c.__hash__() != alpha_node.__hash__():
+                        eq_8 = (v_stash[i] - v_stash[j]) * prob_dict[alpha_node.__hash__(), v_stash[j]] * prob_dict[c.__hash__(), v_stash[i]]
+                        if max < eq_8:
+                            max = eq_8
+                            maxV = v_stash[j]
+                            maxV_tag = v_stash[i]
+                            max_c = c
+        #Lines 7-16
+        S1 = self._S_gather_loop_CVIBES([alpha_node], maxV_tag,prob_dict, prob_dict[alpha_node.__hash__(), maxV_tag])
+        S2 = self._S_gather_loop_CVIBES([max_c], maxV,prob_dict, prob_dict[max_c.__hash__(), maxV])
+        S = S1 + S2
+
+
+
+
+        return S
+
+
+
+
+
+
+
+
 
 
 
@@ -128,7 +253,6 @@ class MCTS:
 
         s=self._batch_gather_greedy(node)
         if len(s) == 0: #TODO ADD THIS!!!!!
-        #if True: #TODO REMOVE THIS!!!!!
             return self.alpha[node]
         max=0
         max_child=None
