@@ -93,7 +93,7 @@ class TicTacToeBoard(Node):
             board.make_move(i) for i, value in enumerate(board.tup) if value == 0
         }
 
-    def find_children_bvoi(board):
+    def find_children_bvoi(board, distribution_mode="NN"):
         if board.terminal:  # If the game is finished then no moves can be made
             return set()
         # Otherwise, you can make a move in each of the empty spots
@@ -109,7 +109,7 @@ class TicTacToeBoard(Node):
         empty_spots = [i for i, value in enumerate(board.tup) if value == 0]
         return board.make_move(choice(empty_spots))
 
-    def find_random_child_bvoi(board):
+    def find_random_child_bvoi(board, distribution_mode = "NN"):
         if board.terminal:
             return None  # If the game is finished then no moves can be made
         empty_spots = [i for i, value in enumerate(board.tup) if value == 0]
@@ -143,7 +143,35 @@ class TicTacToeBoard(Node):
         states[tup] = ret
         return ret
 
+
     def make_move_bvoi(board, index):
+        tup = board.tup[:index] + ((1,) if board.turn else (-1,)) + board.tup[index + 1 :]
+        state=states_cache_bvoi.get(tup)
+        if state is not None:
+            return state
+        turn = not board.turn
+        winner = _find_winner(tup)
+        is_terminal = (winner is not None) or not any(v == 0 for v in tup)
+        to_simulate = TicTacToeBoard(not board.is_max, tup, turn, winner, is_terminal, 0 , board.depth + 1)
+        mcts = MCTS(to_simulate)
+        sum = 0
+        num_sims = 25
+
+        for i in range(num_sims):
+            sum += mcts.simulate(to_simulate, invert_reward = False)
+
+        if not board.is_max:
+            meanvalue = sum / num_sims
+        else:
+            meanvalue = (num_sims - sum) / num_sims
+
+        ret = TicTacToeBoard(not board.is_max, tup, turn, winner, is_terminal, meanvalue, board.depth + 1)
+
+        states[tup] = ret
+        return ret
+
+
+    def make_move_bvoi_NN(board, index):
         tup = board.tup[:index] + ((1,) if board.turn else (-1,)) + board.tup[index + 1 :]
         state=states_cache_bvoi.get(tup)
         if state is not None:
@@ -202,7 +230,7 @@ def play_game(mode="uct"):
         #    break
         # You can train as you go, or only at the beginning.
         # Here, we train as we go, doing fifty rollouts each turn.
-        for i in range(200):
+        for i in range(50):
             print("Lap", i)
             tree.do_rollout(board)
         board = tree.choose(board)
@@ -257,16 +285,7 @@ if __name__ == "__main__":
 
     alphazero_agent = NNetWrapper()
     alphazero_agent.load_checkpoint('./pretrained_models/alternative', 'best-25eps-25sim-10epch.pth.tar')
-    X=np.asarray([1,0,0,    0,-1,0,    0,0,0,]).astype('float32')
-    X=np.reshape(X, (3,3,))
-    print("XXXXX", alphazero_agent.predict(X)[1])
-    X = np.asarray([1, -1, 1,     0, -1, 0,      0, 0, 0, ]).astype('float32')
-    X = np.reshape(X, (3, 3,))
-    print("YYYYY", alphazero_agent.predict(X)[1])
-    X = np.asarray([1, 0, 0, -1, -1, 0, -1, 1, 1, ]).astype('float32')
-    X = np.reshape(X, (3, 3,))
-    print("ZZZZZ", alphazero_agent.predict(X)[1])
-    #tree = play_game()
+
     import time
 
 
@@ -274,7 +293,7 @@ if __name__ == "__main__":
     sum = 10
     for i in range(0,5):
         fail=0
-        board=play_game(mode="bvoi-greedy")
+        board=play_game(mode="c-vibes")
         for x in board.tup:
             if x == 0:
                 fail=1

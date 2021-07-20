@@ -3,5 +3,5 @@ from typing import Any
 
 @dataclass(order=True)
 class PrioritizedItem:
-    priority: int
+    priority: float
     item: Any=field(compare=False)

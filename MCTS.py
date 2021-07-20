@@ -36,13 +36,17 @@ class MCTS:
         self.node_to_tag=dict()
         self.first_time_add=True
         self.conspiracy_queue = []
+        self.BSM_K = 5
+        self.BSM_N = 3
+        self.node_to_path_CVIBES = dict()
+
 
     def _compute_Us(self, node, s):
-        if node.terminal:
-            if node.is_max:
-                return [-1 for b in node.buckets]
-            else:
-                return [1 for b in node.buckets]
+        #if node.terminal:
+        #    if node.is_max:
+        #        return [-1 for b in node.buckets]
+        #    else:
+        #        return [1 for b in node.buckets]
         if self.children.get(node) is None:
             if node.__hash__() in s:
                 return node.buckets
@@ -104,34 +108,34 @@ class MCTS:
         for i in range(len_dist):
             if dist[i]>val:
                 break
+            count = count + 1
         if not bigger_mode:
             return count/len_dist
         return (len_dist-count)/len_dist
 
 
-    def _S_gather_loop_CVIBES(self, open_list, v, prob_table, prob_of_root):
-        S = []
-        while len(open_list) > 0:
-            node = open_list.pop()
-            if self.children.get(node) is None:
-                S.append(node)
-            else:
-                for c in self.children(node):
-                    if prob_table[c.__hash__(), v] == prob_of_root:
-                        open_list.append(c)
+    def _S_gather_rec_CVIBES(self, node, v, prob_table, prob_of_root, path_table, S, path):
+
+
+        if self.children.get(node) is None:
+            S.append(node)
+            path_table[node] = path + [node]
+        else:
+            for c in self.children[node]:
+                if prob_table[c.__hash__(), v] == prob_of_root:
+                   S = S + self._S_gather_rec_CVIBES(c,v,prob_table,prob_of_root,path_table, S, path + [node])
         return S
 
 
     def _store_probabilities(self, node, s, table, v, bigger_mode=True):
-        if node.terminal:
-            if node.is_max:
-                return [-1 for b in node.buckets]
-            else:
-                return [1 for b in node.buckets]
+
         if self.children.get(node) is None:
             if node.__hash__() in s:
+
+                table[node.__hash__(), v] = self.chance_for_dist_biggersmaller_than_val(node.buckets, v, bigger_mode=bigger_mode)
                 return node.buckets
             else:
+                table[node.__hash__(), v] = self.chance_for_dist_biggersmaller_than_val([node.meanvalue for b in node.buckets], v, bigger_mode=bigger_mode)
                 return [node.meanvalue for b in node.buckets]
         is_max=node.is_max
         child_dist=[]
@@ -160,19 +164,25 @@ class MCTS:
 
 
     def _find_k_best_VPI(self, s, k, alpha, c, is_alpha_children):
-        queue = PriorityQueue(maxsize = k)
+        queue = PriorityQueue()
         for leaf in s:
-            PrioritizedItem(self._compute_bvoi_of_child(c,alpha,is_alpha = is_alpha_children,))
-            queue.put()
+            item = PrioritizedItem(-1 * self._compute_bvoi_of_child(self._compute_Us(c,[leaf]),self._compute_Us(alpha,[leaf]),  is_alpha = is_alpha_children, is_max = not alpha.is_max), leaf)
+            queue.put(item)
+        return queue.queue
 
     def _conspiracy_choice(self, node):
-
+        #There are still items in the conspiracy queues
         if len(self.conspiracy_queue) > 0:
-            return self.conspiracy_queue.pop()
+            print("Yousoro")
+            return self.node_to_path_CVIBES[self.conspiracy_queue.pop()]
+
+
+        #different behaviors whether we are the min or max player
+        is_max=node.is_max
 
         #Lines 1-5
         alpha_node = self.alpha[node]
-        alpha_mean = alpha_node.mean_value
+        alpha_mean = alpha_node.meanvalue
         coff_stash = [1.05, 1, 0.95, 0.9, 0.8]
         v_stash = []
         for coff in coff_stash:
@@ -185,9 +195,9 @@ class MCTS:
             for V in v_stash:
                 s = self.gather_leaves(c)
                 if c.__hash__() == alpha_node.__hash__():
-                    self._store_probabilities(c, s, prob_dict,V,bigger_mode=False)
+                    self._store_probabilities(c, s, prob_dict,V,bigger_mode= not is_max)
                 else:
-                    self._store_probabilities(c, s, prob_dict,V,bigger_mode=True)
+                    self._store_probabilities(c, s, prob_dict,V,bigger_mode= is_max)
         #Line 6
         max=0
         maxV=None
@@ -197,21 +207,60 @@ class MCTS:
             for j in range(i + 1, len(v_stash)):
                 for c in self.children[node]:
                     if c.__hash__() != alpha_node.__hash__():
-                        eq_8 = (v_stash[i] - v_stash[j]) * prob_dict[alpha_node.__hash__(), v_stash[j]] * prob_dict[c.__hash__(), v_stash[i]]
+                        if is_max:
+                            eq_8 = (v_stash[i] - v_stash[j]) * prob_dict[alpha_node.__hash__(), v_stash[j]] * prob_dict[c.__hash__(), v_stash[i]]
+                        else:
+                            eq_8 = (v_stash[i] - v_stash[j]) * prob_dict[alpha_node.__hash__(), v_stash[i]] * prob_dict[c.__hash__(), v_stash[j]]
                         if max < eq_8:
                             max = eq_8
                             maxV = v_stash[j]
                             maxV_tag = v_stash[i]
                             max_c = c
+        if maxV_tag is None:
+            print("Kawabanga")
+            return [node, alpha_node]
         #Lines 7-16
-        S1 = self._S_gather_loop_CVIBES([alpha_node], maxV_tag,prob_dict, prob_dict[alpha_node.__hash__(), maxV_tag])
-        S2 = self._S_gather_loop_CVIBES([max_c], maxV,prob_dict, prob_dict[max_c.__hash__(), maxV])
-        S = S1 + S2
+        S1 = self._S_gather_rec_CVIBES(alpha_node, maxV_tag,prob_dict, prob_dict[alpha_node.__hash__(), maxV_tag], self.node_to_path_CVIBES, [], [] )
+        S2 = self._S_gather_rec_CVIBES(max_c, maxV,prob_dict, prob_dict[max_c.__hash__(), maxV], self.node_to_path_CVIBES, [], [])
 
+        #BSM(N,K)
+        K1 = self._find_k_best_VPI(S1,self.BSM_K,alpha_node,self.beta1[node], is_alpha_children= True)
+        K2 = self._find_k_best_VPI(S2, self.BSM_K, alpha_node, max_c, is_alpha_children=False)
 
+        S=[]
+        i1 = 0
+        i2 = 0
+        K_size = min([self.BSM_K, len(K1) + len(K2)])
+        for i in range(K_size):
+            if i1 == len(K1):
+                S.append(K2[i2].item)
+            elif i2 == len(K2):
+                S.append(K1[i1].item)
+            elif K1[i1].priority < K2[i2].priority:
+                S.append(K1[i1].item)
+                i1 = i1 + 1
+            else:
+                S.append(K2[i2].item)
+                i2 = i2 + 1
 
+        leftover_1_items_with_priority = K1[i1:]
+        leftover_2_items_with_priority = K2[i2:]
+        leftover_1 = []
+        leftover_2 = []
+        #Converting the BVOI+node objects to node objects
+        for i in range(len(leftover_1_items_with_priority)):
+            leftover_1.append(leftover_1_items_with_priority[i].item)
+        for i in range(len(leftover_2_items_with_priority)):
+            leftover_2.append(leftover_2_items_with_priority[i].item)
+        #Choosing random K nodes from the leftovers
+        leftovers = leftover_1 + leftover_2
+        S_random = random.choices(leftovers,k=self.BSM_K)
+        S = S + S_random
 
-        return S
+        #Setting the new 2K array as the new conspiracy queue
+        for i in range(self.BSM_N):
+            self.conspiracy_queue = self.conspiracy_queue + S
+        return self.node_to_path_CVIBES[self.conspiracy_queue.pop()]
 
 
 
@@ -313,6 +362,8 @@ class MCTS:
         leaf = path[-1]
         print("Starting to expand")
         self._expand(leaf)
+        if leaf.terminal and leaf.winner == False:
+            print("Kaka")
         print("Finished expanding")
         reward = self.simulate(leaf)
         self._backpropagate(path, reward)
@@ -321,6 +372,7 @@ class MCTS:
         "Find an unexplored descendent of `node`"
         path = []
         first=True
+
         while True:
             path.append(node)
             if node not in self.children or not self.children[node]:
@@ -333,7 +385,16 @@ class MCTS:
                 return path
             if self.mode == "uct":
                 node = self._uct_select(node)
-            if self.mode == "bvoi-greedy":
+            elif self.mode == "c-vibes":
+                if first:
+                    path = self._conspiracy_choice(node)
+                    node = path[-1]
+                    path = path[:-1]
+                    first=False
+                else:
+                    node = self._uct_select(node)
+
+            elif self.mode == "bvoi-greedy":
                 if first:
                     if self.bvoi_counter==self.bvoi_freq:
                         self.bvoi_counter=0
@@ -347,11 +408,12 @@ class MCTS:
                     node = self._uct_select(node)
 
 
+
     def _expand(self, node):
         "Update the `children` dict with the children of `node`"
         if node in self.children:
             return  # already expanded
-        if self.mode == "bvoi-greedy":
+        if self.mode == "bvoi-greedy" or self.mode== "c-vibes":
             children = node.find_children_bvoi(distribution_mode=self.distribution_mode)
         else:
             children = node.find_children()
@@ -386,12 +448,11 @@ class MCTS:
         self.beta1[node]=second_to_max_c
 
 
-    def simulate(self, node):
+    def simulate(self, node, invert_reward=True):
         "Returns the reward for a random simulation (to completion) of `node`"
         #print("Begin simulating!")
         #print(node.is_terminal())
         #print(node.get_legal_moves(1 if node.is_max else -1))
-        invert_reward = True
         while True:
             if node.is_terminal():
                 reward = node.reward()

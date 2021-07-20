@@ -267,8 +267,13 @@ class OthelloBoard(Node):
             sum=0
             num_sims=35
             for i in range(num_sims):
-                sum += mcts.simulate(to_simulate)
-            meanvalue = sum / num_sims
+                sum += mcts.simulate(to_simulate, invert_reward = False)
+
+            if not board.is_max:
+                meanvalue = sum / num_sims
+            else:
+                meanvalue = (num_sims - sum) / num_sims
+
             ret = OthelloBoard(not board.is_max, tup, turn, None, None, meanvalue, board.depth + 1)
             ret.winner = winner
             ret.terminal = terminal
