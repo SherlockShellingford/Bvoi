@@ -4,15 +4,16 @@ from MCTS import MCTS, Node
 import numpy as np
 import math
 from scipy.stats import norm
-from othello.keras.NNet import NNetWrapper
-from MCTSaz import MCTSaz
+print("Bakachan1")
+#from othello.keras.NNet import NNetWrapper
+#from MCTSaz import MCTSaz
 from copy import deepcopy
 from othello.OthelloGame import OthelloGame
 states=dict()
 states_cache_bvoi=dict()
 previous_tree = None
 alphazero_agent=None
-
+print("Bakachan2")
 
 class OthelloBoard(Node):
 
@@ -265,7 +266,7 @@ class OthelloBoard(Node):
             to_simulate.terminal = terminal
             mcts=MCTS(to_simulate)
             sum=0
-            num_sims=35
+            num_sims=5
             for i in range(num_sims):
                 sum += mcts.simulate(to_simulate, invert_reward = False)
 
@@ -352,6 +353,7 @@ def new_othello_board():
 
 
 
+
 def legal_moves_test():
     x=[]
     x.append([0, 0, 0, 0, 0, 0])
@@ -399,7 +401,7 @@ def play_game(mode="uct", distribution_mode="sample"):
     tree = MCTS(board, mode=mode, distribution_mode=distribution_mode)
     tree_uct = MCTS(board, mode="uct")
     game=OthelloGame(6)
-    rival=MCTSaz(game,alphazero_agent)
+    #rival=MCTSaz(game,alphazero_agent)
     print(board.to_pretty_string())
 
     while True:
@@ -423,9 +425,15 @@ def play_game(mode="uct", distribution_mode="sample"):
 
         board = do_turn_mcts(tree_uct, board)
 
-        print(board.to_pretty_string())
 
         if board.terminal:
+            tup2 = []
+            for i in range(6):
+                row = []
+                for j in range(6):
+                    row.append(-board.tup[i][j])
+                tup2.append(row)
+            board = OthelloBoard(not board.is_max, tup2, not board.turn, 1 - board.winner, board.terminal, 0, board.depth)
             break
 
         tup2 = []
@@ -435,7 +443,11 @@ def play_game(mode="uct", distribution_mode="sample"):
                 row.append(-board.tup[i][j])
             tup2.append(row)
         board = OthelloBoard(not board.is_max, tup2, not board.turn, board.winner, board.terminal, 0, board.depth)
+        print(board.to_pretty_string())
 
+
+
+    print(board.to_pretty_string())
     return board
 
 
@@ -444,7 +456,7 @@ def play_game_opposite(mode="uct", distribution_mode="sample"):
     tree = MCTS(board, mode=mode, distribution_mode=distribution_mode)
     tree_uct = MCTS(board, mode="uct")
     game = OthelloGame(6)
-    rival = MCTSaz(game, alphazero_agent)
+    #rival = MCTSaz(game, alphazero_agent)
     print(board.to_pretty_string())
 
     while True:
@@ -456,24 +468,53 @@ def play_game_opposite(mode="uct", distribution_mode="sample"):
         if board.terminal:
             break
 
+        tup2=[]
+        for i in range(6):
+            row = []
+            for j in range(6):
+                row.append(-board.tup[i][j])
+            tup2.append(row)
+
+        board = OthelloBoard(not board.is_max, tup2, not board.turn, board.winner, board.terminal, 0, board.depth)
+
+
         board = do_turn_mcts(tree, board)
 
-        print(board.to_pretty_string())
 
         if board.terminal:
+            tup2 = []
+            for i in range(6):
+                row = []
+                for j in range(6):
+                    row.append(-board.tup[i][j])
+                tup2.append(row)
+            board = OthelloBoard(not board.is_max, tup2, not board.turn, 1 - board.winner, board.terminal, 0, board.depth)
             break
+
+        tup2 = []
+        for i in range(6):
+            row = []
+            for j in range(6):
+                row.append(-board.tup[i][j])
+            tup2.append(row)
+        board = OthelloBoard(not board.is_max, tup2, not board.turn, board.winner, board.terminal, 0, board.depth)
+        print(board.to_pretty_string())
+
+
+
+    print(board.to_pretty_string())
     return board
 
 
 
 
 if __name__ == "__main__":
+    print("MiraiZura")
     #alphazero_agent = NNetWrapper()
     #alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
     #tree = play_game()
     import time
     legal_moves_test()
-
     #real_best = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0], [0, -1, 1, 1, -1, 0], [0, 1, 1, -1, 1, 0], [0, 0, 1, 1, 0, 0],
     # [0, 0, 1, 0, 0, 0]]
 
@@ -513,7 +554,7 @@ if __name__ == "__main__":
     win_sum = 0
     for i in range(0,5):
         fail=0
-        board=play_game(mode="bvoi-greedy")
+        board=play_game(mode="uct")
         win_sum += board.winner
         for x in board.tup:
             if x == 0:
@@ -528,7 +569,7 @@ if __name__ == "__main__":
     print("Time:", start-end)
     for i in range(0,5):
         fail=0
-        board=play_game_opposite(mode="bvoi-greedy", distribution_mode="sample")
+        board=play_game_opposite(mode="uct", distribution_mode="sample")
         win_sum += board.winner
         for x in board.tup:
             if x == 0:

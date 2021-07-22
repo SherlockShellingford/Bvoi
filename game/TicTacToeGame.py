@@ -1,7 +1,7 @@
 from __future__ import print_function
 import sys
 sys.path.append('..')
-from Game import Game
+#from Game import Game
 from .TicTacToeLogic import Board
 import numpy as np
 
@@ -14,7 +14,7 @@ Date: Jan 5, 2018.
 
 Based on the OthelloGame by Surag Nair.
 """
-class TicTacToeGame(Game):
+class TicTacToeGame():
     def __init__(self, n=3):
         self.n = n
 

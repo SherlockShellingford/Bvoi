@@ -10,7 +10,6 @@ import math
 import numpy as np
 import random
 from scipy.integrate import quad
-from treelib import Node, Tree
 from CVIBES.PrioritizedItem import PrioritizedItem
 from queue import PriorityQueue
 
@@ -32,7 +31,6 @@ class MCTS:
         self.bvoi_counter=5
         self.bvoi_freq=5
         self.last_chosen_by_bvoi=None
-        self.tree_vis=Tree()
         self.node_to_tag=dict()
         self.first_time_add=True
         self.conspiracy_queue = []

@@ -1,11 +1,11 @@
 from __future__ import print_function
 import sys
 sys.path.append('..')
-from Game import Game
+#from Game import Game
 from .OthelloLogic import Board
 import numpy as np
 
-class OthelloGame(Game):
+class OthelloGame():
     square_content = {
         -1: "X",
         +0: "-",

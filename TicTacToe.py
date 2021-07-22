@@ -21,8 +21,8 @@ from MCTS import MCTS, Node
 import numpy as np
 import math
 from scipy.stats import norm
-from alphazero.NNet import NNetWrapper
-from MCTSaz import MCTSaz
+#from alphazero.NNet import NNetWrapper
+#from MCTSaz import MCTSaz
 from game.TicTacToeGame import TicTacToeGame
 
 
@@ -78,7 +78,7 @@ class TicTacToeBoard(Node):
                         return self.buckets[i]
             return self.buckets[-1]
 
-        self.distribution=lambda x : dist(norm.rvs(loc=meanvalue,scale=standard_derv, size=None))
+        #self.distribution=lambda x : dist(norm.rvs(loc=meanvalue,scale=standard_derv, size=None))
 
 
 
@@ -210,9 +210,10 @@ class TicTacToeBoard(Node):
 def play_game(mode="uct"):
     board = new_tic_tac_toe_board()
     tree = MCTS(board, mode=mode)
+    tree2 = MCTS(board, mode="uct")
     game=TicTacToeGame()
-    rival=MCTSaz(game,alphazero_agent)
-    prob, v = alphazero_agent.predict(np.asarray(board.tup).astype('float32').reshape((3, 3)))
+    #rival=MCTSaz(game,alphazero_agent)
+    #prob, v = alphazero_agent.predict(np.asarray(board.tup).astype('float32').reshape((3, 3)))
 
     print(board.to_pretty_string())
     while True:
@@ -237,21 +238,11 @@ def play_game(mode="uct"):
         print(board.to_pretty_string())
         if board.terminal:
             break
-        tup2=[]
-        for x in board.tup:
-            tup2.append(-x)
-        prob=rival.getActionProb(np.asarray(tup2).astype('float32').reshape((3,3)))
-        maxi=-1
-        maxx=-1
-        for i in range(len(prob)):
-            if prob[i]>maxx:
-                maxi=i
-                maxx=prob[i]
-        print(prob)
-        print("Rival chose:", maxi)
-        board=board.make_move_bvoi(maxi)
+        for i in range(150):
+            tree2.do_rollout(board)
+        board = tree2.choose(board)
         print(board.to_pretty_string())
-
+        
         if board.terminal:
             break
     return board
@@ -283,8 +274,8 @@ def new_tic_tac_toe_board():
 
 if __name__ == "__main__":
 
-    alphazero_agent = NNetWrapper()
-    alphazero_agent.load_checkpoint('./pretrained_models/alternative', 'best-25eps-25sim-10epch.pth.tar')
+    #alphazero_agent = NNetWrapper()
+    #alphazero_agent.load_checkpoint('./pretrained_models/alternative', 'best-25eps-25sim-10epch.pth.tar')
 
     import time
 
