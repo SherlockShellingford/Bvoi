@@ -4,16 +4,17 @@ from MCTS import MCTS, Node
 import numpy as np
 import math
 from scipy.stats import norm
-print("Bakachan1")
-#from othello.keras.NNet import NNetWrapper
-#from MCTSaz import MCTSaz
+from othello.keras.NNet import NNetWrapper
+from MCTSaz import MCTSaz
 from copy import deepcopy
 from othello.OthelloGame import OthelloGame
 states=dict()
 states_cache_bvoi=dict()
 previous_tree = None
 alphazero_agent=None
-print("Bakachan2")
+deductable_time = 0
+added_time = 0
+
 
 class OthelloBoard(Node):
 
@@ -266,7 +267,10 @@ class OthelloBoard(Node):
             to_simulate.terminal = terminal
             mcts=MCTS(to_simulate)
             sum=0
-            num_sims=5
+            num_sims=35
+            global deductable_time
+            global added_time
+            start = time.time()
             for i in range(num_sims):
                 sum += mcts.simulate(to_simulate, invert_reward = False)
 
@@ -274,7 +278,9 @@ class OthelloBoard(Node):
                 meanvalue = sum / num_sims
             else:
                 meanvalue = (num_sims - sum) / num_sims
-
+            end = time.time()
+            deductable_time = deductable_time + end - start
+            added_time = added_time + 0.062408
             ret = OthelloBoard(not board.is_max, tup, turn, None, None, meanvalue, board.depth + 1)
             ret.winner = winner
             ret.terminal = terminal
@@ -353,7 +359,6 @@ def new_othello_board():
 
 
 
-
 def legal_moves_test():
     x=[]
     x.append([0, 0, 0, 0, 0, 0])
@@ -390,9 +395,20 @@ def do_turn_alphazeroagent(mcts, board):
 
 
 def do_turn_mcts(tree, board):
-    for i in range(30):
+    time_limit = 7
+    global deductable_time
+    global added_time
+    i = 0
+    deductable_time = 0
+    added_time = 0
+    start = time.time()
+    while True:
         print("Lap", i)
+        i = i + 1
         tree.do_rollout(board)
+        if time.time() - start - deductable_time + added_time > time_limit:
+            break
+        print(time.time() - start - deductable_time + added_time)
     board = tree.choose(board)
     return board
 
@@ -509,12 +525,12 @@ def play_game_opposite(mode="uct", distribution_mode="sample"):
 
 
 if __name__ == "__main__":
-    print("MiraiZura")
     #alphazero_agent = NNetWrapper()
     #alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
     #tree = play_game()
     import time
     legal_moves_test()
+
     #real_best = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0], [0, -1, 1, 1, -1, 0], [0, 1, 1, -1, 1, 0], [0, 0, 1, 1, 0, 0],
     # [0, 0, 1, 0, 0, 0]]
 
@@ -569,7 +585,7 @@ if __name__ == "__main__":
     print("Time:", start-end)
     for i in range(0,5):
         fail=0
-        board=play_game_opposite(mode="uct", distribution_mode="sample")
+        board=play_game_opposite(mode="bvoi-greedy", distribution_mode="sample")
         win_sum += board.winner
         for x in board.tup:
             if x == 0:
