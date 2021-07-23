@@ -5,10 +5,10 @@ from utils import *
 import tensorflow as tf
 
 class OthelloNNet():
-    def __init__(self, game, args):
+    def __init__(self,  args):
         # game params
-        self.board_x, self.board_y = game.getBoardSize()
-        self.action_size = game.getActionSize()
+        self.board_x, self.board_y = (6,6)
+        self.action_size = 37
         self.args = args
 
         # Renaming functions 

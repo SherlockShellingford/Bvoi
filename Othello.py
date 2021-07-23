@@ -5,7 +5,7 @@ import numpy as np
 import math
 from scipy.stats import norm
 from othello.keras.NNet import NNetWrapper
-from MCTSaz import MCTSaz
+#from MCTSaz import MCTSaz
 from copy import deepcopy
 from othello.OthelloGame import OthelloGame
 states=dict()
@@ -14,7 +14,6 @@ previous_tree = None
 alphazero_agent=None
 deductable_time = 0
 added_time = 0
-
 
 class OthelloBoard(Node):
 
@@ -268,6 +267,7 @@ class OthelloBoard(Node):
             mcts=MCTS(to_simulate)
             sum=0
             num_sims=35
+            global time_for_nn
             global deductable_time
             global added_time
             start = time.time()
@@ -280,7 +280,7 @@ class OthelloBoard(Node):
                 meanvalue = (num_sims - sum) / num_sims
             end = time.time()
             deductable_time = deductable_time + end - start
-            added_time = added_time + 0.062408
+            added_time = added_time + time_for_nn
             ret = OthelloBoard(not board.is_max, tup, turn, None, None, meanvalue, board.depth + 1)
             ret.winner = winner
             ret.terminal = terminal
@@ -395,7 +395,8 @@ def do_turn_alphazeroagent(mcts, board):
 
 
 def do_turn_mcts(tree, board):
-    time_limit = 7
+
+    time_limit = 15
     global deductable_time
     global added_time
     i = 0
@@ -403,12 +404,12 @@ def do_turn_mcts(tree, board):
     added_time = 0
     start = time.time()
     while True:
-        print("Lap", i)
         i = i + 1
         tree.do_rollout(board)
         if time.time() - start - deductable_time + added_time > time_limit:
             break
-        print(time.time() - start - deductable_time + added_time)
+    
+    print("Lap", i)
     board = tree.choose(board)
     return board
 
@@ -525,31 +526,36 @@ def play_game_opposite(mode="uct", distribution_mode="sample"):
 
 
 if __name__ == "__main__":
-    #alphazero_agent = NNetWrapper()
-    #alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
+    
+    
+    global time_for_nn
+    alphazero_agent = NNetWrapper()
+    alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
     #tree = play_game()
     import time
     legal_moves_test()
 
-    #real_best = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0], [0, -1, 1, 1, -1, 0], [0, 1, 1, -1, 1, 0], [0, 0, 1, 1, 0, 0],
-    # [0, 0, 1, 0, 0, 0]]
+    real_best = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0], [0, -1, 1, 1, -1, 0], [0, 1, 1, -1, 1, 0], [0, 0, 1, 1, 0, 0],
+     [0, 0, 1, 0, 0, 0]]
 
-    #best = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0], [1, 1, 1, 1, -1, 0], [0, 1, -1, -1, 1, 0], [0, 0, -1, -1, 0, 0],
-    # [0, 0, 0, 0, 0, 0]]
+    best = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0], [1, 1, 1, 1, -1, 0], [0, 1, -1, -1, 1, 0], [0, 0, -1, -1, 0, 0],
+     [0, 0, 0, 0, 0, 0]]
 
-    #father = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0], [0, -1, -1, 1, -1, 0], [0, 1, -1, -1, 1, 0], [0, 0, -1, -1, 0, 0],
-    #             [0, 0, 0, 0, 0, 0]]
+    father = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0], [0, -1, -1, 1, -1, 0], [0, 1, -1, -1, 1, 0], [0, 0, -1, -1, 0, 0],
+                 [0, 0, 0, 0, 0, 0]]
 
-    #one = [[1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1],
-    #          [1, 1, 1, 1, 1, 1]]
+    one = [[1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1],
+              [1, 1, 1, 1, 1, 1]]
 
-    #X = np.asarray(one).astype('float32')
-    #X = np.reshape(X, (6, 6,))
-
-    #meanvalue_complete = alphazero_agent.predict(X)[1][0]  # 0 is pi and 1 is v
-
-    #X = np.asarray(father).astype('float32')
-    #X = np.reshape(X, (6, 6,))
+    X = np.asarray(one).astype('float32')
+    X = np.reshape(X, (6, 6,))
+    start=time.time()
+    for i in range(100):
+      meanvalue_complete = alphazero_agent.predict(X)[1][0]  # 0 is pi and 1 is v
+    end=time.time()
+    time_for_nn = (end-start) / 100
+    X = np.asarray(father).astype('float32')
+    X = np.reshape(X, (6, 6,))
 
     #pi, v = alphazero_agent.predict(X)  # 0 is pi and 1 is v
 

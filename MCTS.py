@@ -171,7 +171,6 @@ class MCTS:
     def _conspiracy_choice(self, node):
         #There are still items in the conspiracy queues
         if len(self.conspiracy_queue) > 0:
-            print("Yousoro")
             return self.node_to_path_CVIBES[self.conspiracy_queue.pop()]
 
 
@@ -215,7 +214,6 @@ class MCTS:
                             maxV_tag = v_stash[i]
                             max_c = c
         if maxV_tag is None:
-            print("Kawabanga")
             return [node, alpha_node]
         #Lines 7-16
         S1 = self._S_gather_rec_CVIBES(alpha_node, maxV_tag,prob_dict, prob_dict[alpha_node.__hash__(), maxV_tag], self.node_to_path_CVIBES, [], [] )
@@ -337,13 +335,13 @@ class MCTS:
                 return float("-inf")  # avoid unseen moves
             return self.Q[n] / self.N[n]  # average reward
 
-        for c in self.children[node]:
-            print(c.tup)
-            print(self.Q[c])
-            print(self.N[c])
-            print(c.meanvalue)
-            x=self._compute_Us(c,[])
-            print(x)
+        #for c in self.children[node]:
+        #    print(c.tup)
+        #    print(self.Q[c])
+        #    print(self.N[c])
+        #    print(c.meanvalue)
+        #    x=self._compute_Us(c,[])
+        #    print(x)
             #if x[0]>2:
             #    print("Chikachika")
             #    while True:
@@ -358,11 +356,7 @@ class MCTS:
 
         path = self._select(node)
         leaf = path[-1]
-        print("Starting to expand")
         self._expand(leaf)
-        if leaf.terminal and leaf.winner == False:
-            print("Kaka")
-        print("Finished expanding")
         reward = self.simulate(leaf)
         self._backpropagate(path, reward)
 
