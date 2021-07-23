@@ -232,13 +232,13 @@ def play_game(mode="uct"):
         # You can train as you go, or only at the beginning.
         # Here, we train as we go, doing fifty rollouts each turn.
         for i in range(50):
-            print("Lap", i)
+            print("Lap ",i)
             tree.do_rollout(board)
         board = tree.choose(board)
         print(board.to_pretty_string())
         if board.terminal:
             break
-        for i in range(150):
+        for i in range(300):
             tree2.do_rollout(board)
         board = tree2.choose(board)
         print(board.to_pretty_string())
@@ -281,13 +281,16 @@ if __name__ == "__main__":
 
 
     start = time.time()
-    sum = 10
-    for i in range(0,5):
+    sum = 100
+    for i in range(0,100):
         fail=0
         board=play_game(mode="c-vibes")
         for x in board.tup:
             if x == 0:
                 fail=1
+        if fail == 1:
+            print("Kawabanga")
+            print(board.to_pretty_string())
         sum=sum-fail
     print("We got ", sum)
     print("tie out of 5")
