@@ -35,11 +35,10 @@ class MCTS:
         self.first_time_add=True
         self.conspiracy_queue = []
         self.BSM_K = 5
-        self.BSM_N = 3
+        self.BSM_N = 1
         self.node_to_path_CVIBES = dict()
-
-
     def _compute_Us(self, node, s):
+
         #if node.terminal:
         #    if node.is_max:
         #        return [-1 for b in node.buckets]
@@ -55,7 +54,7 @@ class MCTS:
 
         child_dist=[]
         for c in self.children[node]:
-            child_dist.append(self._compute_Us(c,s))
+                child_dist.append(self._compute_Us(c,s))
         ret=[]
         for i in range(len(node.buckets)):
             if is_max:
@@ -121,7 +120,7 @@ class MCTS:
         else:
             for c in self.children[node]:
                 if prob_table[c.__hash__(), v] == prob_of_root:
-                   S = S + self._S_gather_rec_CVIBES(c,v,prob_table,prob_of_root,path_table, S, path + [node])
+                   S = self._S_gather_rec_CVIBES(c,v,prob_table,prob_of_root,path_table, S, path + [node])
         return S
 
 
@@ -210,14 +209,18 @@ class MCTS:
                             eq_8 = (v_stash[i] - v_stash[j]) * prob_dict[alpha_node.__hash__(), v_stash[i]] * prob_dict[c.__hash__(), v_stash[j]]
                         if max < eq_8:
                             max = eq_8
-                            maxV = v_stash[j]
-                            maxV_tag = v_stash[i]
+                            if is_max:
+                                maxV = v_stash[j]
+                                maxV_tag = v_stash[i]
+                            else:
+                                maxV_tag = v_stash[j]
+                                maxV = v_stash[i]
                             max_c = c
         if maxV_tag is None:
             return [node, alpha_node]
         #Lines 7-16
-        S1 = self._S_gather_rec_CVIBES(alpha_node, maxV_tag,prob_dict, prob_dict[alpha_node.__hash__(), maxV_tag], self.node_to_path_CVIBES, [], [] )
-        S2 = self._S_gather_rec_CVIBES(max_c, maxV,prob_dict, prob_dict[max_c.__hash__(), maxV], self.node_to_path_CVIBES, [], [])
+        S1 = self._S_gather_rec_CVIBES(alpha_node, maxV,prob_dict, prob_dict[alpha_node.__hash__(), maxV], self.node_to_path_CVIBES, [], [] )
+        S2 = self._S_gather_rec_CVIBES(max_c, maxV_tag,prob_dict, prob_dict[max_c.__hash__(), maxV_tag], self.node_to_path_CVIBES, [], [])
 
         #BSM(N,K)
         K1 = self._find_k_best_VPI(S1,self.BSM_K,alpha_node,self.beta1[node], is_alpha_children= True)
@@ -250,7 +253,7 @@ class MCTS:
             leftover_2.append(leftover_2_items_with_priority[i].item)
         #Choosing random K nodes from the leftovers
         leftovers = leftover_1 + leftover_2
-        S_random = random.choices(leftovers,k=self.BSM_K)
+        S_random = random.choices(leftovers,k= min([self.BSM_K, len(leftovers)]))
         S = S + S_random
 
         #Setting the new 2K array as the new conspiracy queue
