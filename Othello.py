@@ -406,17 +406,22 @@ def do_turn_mcts(tree, board):
     while True:
         i = i + 1
         tree.do_rollout(board)
-        if time.time() - start - deductable_time + added_time > time_limit:
+        end = time.time()
+        if end - start - deductable_time + added_time > time_limit:
             break
-    
+        
+        
+        
     print("Lap", i)
+    print("Deductible:", deductable_time)
+    print("Added:", added_time)
     board = tree.choose(board)
     return board
 
-def play_game(mode="uct", distribution_mode="sample"):
+def play_game(mode="uct", mode2 = "uct", distribution_mode="sample"):
     board = new_othello_board()
     tree = MCTS(board, mode=mode, distribution_mode=distribution_mode)
-    tree_uct = MCTS(board, mode="uct")
+    tree2 = MCTS(board, mode=mode2, distribution_mode=distribution_mode)
     game=OthelloGame(6)
     #rival=MCTSaz(game,alphazero_agent)
     print(board.to_pretty_string())
@@ -430,6 +435,7 @@ def play_game(mode="uct", distribution_mode="sample"):
         if board.terminal:
             break
 
+
         tup2=[]
         for i in range(6):
             row = []
@@ -440,7 +446,7 @@ def play_game(mode="uct", distribution_mode="sample"):
         board = OthelloBoard(not board.is_max, tup2, not board.turn, board.winner, board.terminal, 0, board.depth)
 
 
-        board = do_turn_mcts(tree_uct, board)
+        board = do_turn_mcts(tree2, board)
 
 
         if board.terminal:
@@ -554,6 +560,7 @@ if __name__ == "__main__":
       meanvalue_complete = alphazero_agent.predict(X)[1][0]  # 0 is pi and 1 is v
     end=time.time()
     time_for_nn = (end-start) / 100
+    print("Time for nn:", time_for_nn)
     X = np.asarray(father).astype('float32')
     X = np.reshape(X, (6, 6,))
 
@@ -568,15 +575,15 @@ if __name__ == "__main__":
 
     #o.make_move_bvoi(32)
     #o.make_move_bvoi(12)
-
+    
 
 
     start = time.time()
     sum = 10
     win_sum = 0
-    for i in range(0,5):
+    for i in range(0,2):
         fail=0
-        board=play_game(mode="uct")
+        board=play_game(mode="bvoi-greedy", mode2 = "uct")
         win_sum += board.winner
         for x in board.tup:
             if x == 0:
@@ -589,9 +596,9 @@ if __name__ == "__main__":
     win_sum = 0
     end = time.time()
     print("Time:", start-end)
-    for i in range(0,5):
+    for i in range(0,2):
         fail=0
-        board=play_game_opposite(mode="bvoi-greedy", distribution_mode="sample")
+        board=play_game(mode="uct", mode2 = "bvoi-greedy")
         win_sum += board.winner
         for x in board.tup:
             if x == 0:

@@ -207,10 +207,10 @@ class TicTacToeBoard(Node):
         )
 
 
-def play_game(mode="uct"):
+def play_game(mode="uct", mode2 ="uct"):
     board = new_tic_tac_toe_board()
     tree = MCTS(board, mode=mode)
-    tree2 = MCTS(board, mode="uct")
+    tree2 = MCTS(board, mode=mode2)
     game=TicTacToeGame()
     #rival=MCTSaz(game,alphazero_agent)
     #prob, v = alphazero_agent.predict(np.asarray(board.tup).astype('float32').reshape((3, 3)))
@@ -232,7 +232,6 @@ def play_game(mode="uct"):
         # You can train as you go, or only at the beginning.
         # Here, we train as we go, doing fifty rollouts each turn.
         for i in range(50):
-            print("Lap ",i)
             tree.do_rollout(board)
         board = tree.choose(board)
         print(board.to_pretty_string())
@@ -282,16 +281,24 @@ if __name__ == "__main__":
 
     start = time.time()
     sum = 100
-    for i in range(0,100):
+    for i in range(0,50):
         fail=0
-        board=play_game(mode="c-vibes")
-        for x in board.tup:
-            if x == 0:
-                fail=1
-        if fail == 1:
-            print("Kawabanga")
-            print(board.to_pretty_string())
+        board=play_game(mode="c-vibes", mode2= "uct")
+        
+        if board.reward != 0.5:
+          print("Kawabanga")
+          print(board.to_pretty_string())
+          fail = 1
         sum=sum-fail
+    for i in range(0,50):
+        fail=0
+        board=play_game(mode="uct", mode2= "c-vibes")
+        if board.reward != 0.5:
+          print("Kawabanga")
+          print(board.to_pretty_string())
+          fail = 1
+        sum=sum-fail
+    
     print("We got ", sum)
     print("tie out of 5")
     end = time.time()

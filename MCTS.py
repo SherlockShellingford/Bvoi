@@ -34,7 +34,7 @@ class MCTS:
         self.node_to_tag=dict()
         self.first_time_add=True
         self.conspiracy_queue = []
-        self.BSM_K = 5
+        self.BSM_K = 3
         self.BSM_N = 1
         self.node_to_path_CVIBES = dict()
     def _compute_Us(self, node, s):
@@ -259,6 +259,8 @@ class MCTS:
         #Setting the new 2K array as the new conspiracy queue
         for i in range(self.BSM_N):
             self.conspiracy_queue = self.conspiracy_queue + S
+        if not self.conspiracy_queue:
+          return [node, alpha_node]
         return self.node_to_path_CVIBES[self.conspiracy_queue.pop()]
 
 
