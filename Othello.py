@@ -15,6 +15,7 @@ alphazero_agent=None
 deductable_time = 0
 added_time = 0
 
+
 class OthelloBoard(Node):
 
     __directions = [(1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1)]
@@ -409,9 +410,9 @@ def do_turn_mcts(tree, board):
         end = time.time()
         if end - start - deductable_time + added_time > time_limit:
             break
-        
-        
-        
+
+
+
     print("Lap", i)
     print("Deductible:", deductable_time)
     print("Added:", added_time)
@@ -434,7 +435,6 @@ def play_game(mode="uct", mode2 = "uct", distribution_mode="sample"):
 
         if board.terminal:
             break
-
 
         tup2=[]
         for i in range(6):
@@ -532,8 +532,8 @@ def play_game_opposite(mode="uct", distribution_mode="sample"):
 
 
 if __name__ == "__main__":
-    
-    
+
+
     global time_for_nn
     alphazero_agent = NNetWrapper()
     alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
@@ -575,7 +575,7 @@ if __name__ == "__main__":
 
     #o.make_move_bvoi(32)
     #o.make_move_bvoi(12)
-    
+
 
 
     start = time.time()

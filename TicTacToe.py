@@ -53,6 +53,7 @@ class TicTacToeBoard(Node):
         standard_derv=(9-depth)*0.3/9
         self.is_max=max
         self.tup=tup
+        self.marked=0
         self.turn=turn
         self.winner=winner
         self.terminal=terminal
@@ -283,18 +284,25 @@ if __name__ == "__main__":
     sum = 100
     for i in range(0,50):
         fail=0
-        board=play_game(mode="c-vibes", mode2= "uct")
+        board=play_game(mode="bvoi-greedy", mode2= "uct")
         
-        if board.reward != 0.5:
-          print("Kawabanga")
-          print(board.to_pretty_string())
-          fail = 1
+        if board.reward() != 0.5:
+            if not board.is_max:
+                print("Kawabanga")
+            else:
+                print("Pikapika")
+            print(board.to_pretty_string())
+            fail = 1
         sum=sum-fail
-    for i in range(0,50):
+    print("mikapika")
+    for i in range(0,100):
         fail=0
-        board=play_game(mode="uct", mode2= "c-vibes")
-        if board.reward != 0.5:
-          print("Kawabanga")
+        board=play_game(mode="uct", mode2= "bvoi-greedy")
+        if board.reward() != 0.5:
+          if board.is_max:
+            print("Kawabanga")
+          else:
+              print("Pikapika")
           print(board.to_pretty_string())
           fail = 1
         sum=sum-fail

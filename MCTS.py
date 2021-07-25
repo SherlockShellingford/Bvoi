@@ -37,24 +37,58 @@ class MCTS:
         self.BSM_K = 3
         self.BSM_N = 1
         self.node_to_path_CVIBES = dict()
-    def _compute_Us(self, node, s):
+        self.node_to_dry_Us = dict()
+        self.node_to_dry_Us[root] = [root.meanvalue for b in root.buckets]
 
+
+    def _mark_ancestors(self, node):
+        node.marked = node.marked + 1
+        if self.child_to_father.get(node) is None:
+            return
+        self._mark_ancestors(self.child_to_father[node])
+
+    def _mark_all_S_ancestors(self, s):
+        for node in s:
+            self._mark_ancestors(node)
+
+
+    def _compute_Us_for_all_children(self, node, s):
+        self._mark_all_S_ancestors(s)
+        return self._compute_Us(node, return_children=True)
+
+
+    def _compute_Us(self, node, return_children=False):
+
+        random_checkup = False
+        if node.marked == 0:
+            if random.random() < 0.3:
+                random_checkup = True
+            else:
+                return self.node_to_dry_Us[node]
+
+
+        node.marked = max([node.marked - 1, 0])
         #if node.terminal:
         #    if node.is_max:
         #        return [-1 for b in node.buckets]
         #    else:
         #        return [1 for b in node.buckets]
-        if self.children.get(node) is None:
-            if node.__hash__() in s:
-                return node.buckets
-            else:
+        if self.children.get(node) is None or len(self.children.get(node)) == 0:
+            if random_checkup:
                 return [node.meanvalue for b in node.buckets]
+            return node.buckets
 
         is_max=node.is_max
 
+
+        if return_children:
+            ret = dict()
+            for c in self.children[node]:
+                ret[c] = self._compute_Us(c)
+            return ret
         child_dist=[]
         for c in self.children[node]:
-                child_dist.append(self._compute_Us(c,s))
+            child_dist.append(self._compute_Us(c))
         ret=[]
         for i in range(len(node.buckets)):
             if is_max:
@@ -70,6 +104,15 @@ class MCTS:
                         max_or_min=c[i]
             ret.append(max_or_min)
 
+        if random_checkup:
+            for i in range(len(ret)):
+                if ret[i] != self.node_to_dry_Us[node][i]:
+                    print("OH NOOOOOOO!!!!")
+                    print(ret)
+                    print(self.node_to_dry_Us[node])
+                    for c in self.children[node]:
+                        print("kookoo")
+                    moomoo = rooroo
         return ret
 
     def gather_leaves(self, node):
@@ -278,16 +321,17 @@ class MCTS:
         s=[]
         alpha_node = self.alpha[node]
         beta1_node = self.beta1[node]
-        alpha_Us = self._compute_Us(alpha_node, [])
-        alpha_leaves = self.gather_leaves(alpha_node)
-        for c in self.children[node]:
-            leaves=alpha_leaves + self.gather_leaves(c)
-            for l in leaves:
+        alpha_Us = self._compute_Us(alpha_node)
+
+        leaves = self.gather_leaves(node)
+        for l in leaves:
+            child_to_Us = self._compute_Us_for_all_children(node, [l] )
+            for c in self.children[node]:
                 if l not in s:
                     if c.__hash__() != alpha_node.__hash__():
-                        c_bvoi = self._compute_bvoi_of_child(self._compute_Us(c, [l.__hash__()]), alpha_Us, node.is_max)
+                        c_bvoi = self._compute_bvoi_of_child(child_to_Us[c], alpha_Us, node.is_max)
                     else:
-                        c_bvoi = self._compute_bvoi_of_child(self._compute_Us(beta1_node, [l.__hash__()]), self._compute_Us(c, [l.__hash__()]),
+                        c_bvoi = self._compute_bvoi_of_child(child_to_Us[beta1_node], child_to_Us[c] ,
                                                              is_alpha=True, is_max=node.is_max)
                     if c_bvoi>0:
                         s.append(l)
@@ -308,11 +352,13 @@ class MCTS:
         max_child=None
         alpha_node=self.alpha[node]
         beta1_node=self.beta1[node]
-        alpha_Us=self._compute_Us(alpha_node,s)
-        beta1_Us = self._compute_Us(beta1_node, s)
+        child_to_Us = self._compute_Us_for_all_children(node, s)
+        alpha_Us=child_to_Us[alpha_node]
+        beta1_Us = child_to_Us[beta1_node]
+
 
         for c in self.children[node]:
-            child_Us=self._compute_Us(c,s)
+            child_Us=child_to_Us[c]
             if c.__hash__() != alpha_node.__hash__():
                 c_bvoi=self._compute_bvoi_of_child(child_Us,alpha_Us, is_max=node.is_max)
             else:
@@ -358,6 +404,8 @@ class MCTS:
 
 
     def do_rollout(self, node):
+        if self.node_to_dry_Us.get(node) is None:
+            self.node_to_dry_Us[node] = [node.meanvalue for b in node.buckets]
 
         path = self._select(node)
         leaf = path[-1]
@@ -404,6 +452,31 @@ class MCTS:
                 else:
                     node = self._uct_select(node)
 
+    def update_dry_Us(self, node):
+
+        if node.is_max:
+            changed = False
+            max=[np.NINF]
+            for c in self.children[node]:
+                if max[0] < self.node_to_dry_Us[c][0]:
+                    changed = True
+                    max =  self.node_to_dry_Us[c]
+            if changed:
+                self.node_to_dry_Us[node] = max
+                if self.child_to_father.get(node) is not None:
+                    self.update_dry_Us(self.child_to_father.get(node))
+        else:
+            changed = False
+
+            min=[np.inf]
+            for c in self.children[node]:
+                if self.node_to_dry_Us[c][0] < min[0]:
+                    changed = True
+                    min = self.node_to_dry_Us[c]
+            if changed:
+                self.node_to_dry_Us[node] = min
+                if self.child_to_father.get(node) is not None:
+                    self.update_dry_Us(self.child_to_father.get(node))
 
 
     def _expand(self, node):
@@ -432,6 +505,13 @@ class MCTS:
 #            self.node_to_tag[n]=self.node_to_tag[node] + ''.join([str(i) for i in n.tup])
 #            self.tree_vis.create_node(str(n.meanvalue),self.node_to_tag[node] + ''.join([str(i) for i in n.tup]),parent=self.node_to_tag[node])
             # Visualazation
+
+            #Markdown algorithm
+            self.child_to_father[n] = node
+            self.node_to_dry_Us[n] = [n.meanvalue for b in n.buckets]
+
+
+
             if (is_max and n.meanvalue>max)  or (not is_max and n.meanvalue<max):
                 second_to_max=max
                 second_to_max_c=max_c
@@ -443,6 +523,7 @@ class MCTS:
                     second_to_max_c=n
         self.alpha[node]=max_c
         self.beta1[node]=second_to_max_c
+        self.update_dry_Us(node)
 
 
     def simulate(self, node, invert_reward=True):
