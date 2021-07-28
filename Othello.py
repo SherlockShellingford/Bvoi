@@ -3,6 +3,7 @@ from random import choice, getrandbits
 from MCTS import MCTS, Node
 import numpy as np
 import math
+import logging
 from scipy.stats import norm
 from othello.keras.NNet import NNetWrapper
 #from MCTSaz import MCTSaz
@@ -26,6 +27,7 @@ class OthelloBoard(Node):
         self.is_max=max
         self.tup=tup
         self.tup66=tup
+        self.marked = False
         self.turn=turn
         self.winner=winner
         self.terminal=terminal
@@ -272,13 +274,18 @@ class OthelloBoard(Node):
             global deductable_time
             global added_time
             start = time.time()
+            sim_result_vector = []
+            print(tup)
             for i in range(num_sims):
-                sum += mcts.simulate(to_simulate, invert_reward = False)
-
+                #sum += mcts.simulate(to_simulate, invert_reward = False)
+                sim_result_vector.append(mcts.simulate(to_simulate, invert_reward = False))
+            print(sim_result_vector)
+            rooroo=kookoo
             if not board.is_max:
                 meanvalue = sum / num_sims
             else:
                 meanvalue = (num_sims - sum) / num_sims
+            
             end = time.time()
             deductable_time = deductable_time + end - start
             added_time = added_time + time_for_nn
@@ -394,12 +401,14 @@ def do_turn_alphazeroagent(mcts, board):
     board = board.make_move_bvoi(maxi)
     return board
 
+kroopy = 0
 
 def do_turn_mcts(tree, board):
 
     time_limit = 15
     global deductable_time
     global added_time
+    global kroopy
     i = 0
     deductable_time = 0
     added_time = 0
@@ -410,6 +419,9 @@ def do_turn_mcts(tree, board):
         end = time.time()
         if end - start - deductable_time + added_time > time_limit:
             break
+    
+    logging.info("Turn ended: %d", kroopy)
+    kroopy += 1
 
 
 
@@ -535,6 +547,8 @@ if __name__ == "__main__":
 
 
     global time_for_nn
+    
+    logging.info("Hajime masho!")
     alphazero_agent = NNetWrapper()
     alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
     #tree = play_game()
@@ -581,7 +595,7 @@ if __name__ == "__main__":
     start = time.time()
     sum = 10
     win_sum = 0
-    for i in range(0,2):
+    for i in range(0,5):
         fail=0
         board=play_game(mode="bvoi-greedy", mode2 = "uct")
         win_sum += board.winner
@@ -589,6 +603,7 @@ if __name__ == "__main__":
             if x == 0:
                 fail=1
         sum=sum-fail
+        logging.info("Game ended")
 
 
 
@@ -596,7 +611,7 @@ if __name__ == "__main__":
     win_sum = 0
     end = time.time()
     print("Time:", start-end)
-    for i in range(0,2):
+    for i in range(0,5):
         fail=0
         board=play_game(mode="uct", mode2 = "bvoi-greedy")
         win_sum += board.winner
@@ -604,6 +619,7 @@ if __name__ == "__main__":
             if x == 0:
                 fail=1
         sum=sum-fail
+        logging.info("Game ended")
 
     print("Win_sum:", win_sum)
     end = time.time()
