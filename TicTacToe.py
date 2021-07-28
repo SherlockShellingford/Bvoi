@@ -24,7 +24,7 @@ from scipy.stats import norm
 #from alphazero.NNet import NNetWrapper
 #from MCTSaz import MCTSaz
 from game.TicTacToeGame import TicTacToeGame
-
+import pickle
 
 _TTTB = namedtuple("TicTacToeBoard", "tup turn winner terminal")
 
@@ -271,13 +271,52 @@ def _find_winner(tup):
 def new_tic_tac_toe_board():
     return TicTacToeBoard(True, (0,) * 9, True, None, False,0, 0)
 
+def simulate(node, dict):
+    path = []
+    invert_reward = False
+    while True:
+        path.append((node))
+        if node.is_terminal():
+            reward = node.reward()
+            reward = 1 - reward if invert_reward else reward
+            break
+        node = node.find_random_child()
+                #print(node.is_terminal())
+                #print(node.get_legal_moves(1 if node.is_max else -1))
+        invert_reward = not invert_reward
+    path2 = reversed(path)
+    for node in path2:
+        n = node.tup
+        if dict.get(n) is None:
+            dict[n] = (reward, 1)
+        else:
+            dict[n] = ((dict[n][0]*dict[n][1] + reward)/(dict[n][1] + 1), dict[n][1] + 1)
 
+
+def simulate_until_no_tomorrow(load = False):
+
+    if load:
+        f = open("weak_heuristic", "rb")
+        result_dict = pickle.load(f)
+        f.close()
+    else:
+        result_dict = {}
+
+    init = new_tic_tac_toe_board()
+    for _ in range(10):
+        simulate(init, result_dict)
+    f = open("weak_heuristic", "wb")
+    pickle.dump(result_dict, f)
+    f.close()
 if __name__ == "__main__":
 
     #alphazero_agent = NNetWrapper()
     #alphazero_agent.load_checkpoint('./pretrained_models/alternative', 'best-25eps-25sim-10epch.pth.tar')
 
     import time
+
+    simulate_until_no_tomorrow(load = True)
+    exit(0)
 
 
     start = time.time()

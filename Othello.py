@@ -4,6 +4,7 @@ from MCTS import MCTS, Node
 import numpy as np
 import math
 import logging
+import pickle
 from scipy.stats import norm
 from othello.keras.NNet import NNetWrapper
 #from MCTSaz import MCTSaz
@@ -285,7 +286,7 @@ class OthelloBoard(Node):
                 meanvalue = sum / num_sims
             else:
                 meanvalue = (num_sims - sum) / num_sims
-            
+
             end = time.time()
             deductable_time = deductable_time + end - start
             added_time = added_time + time_for_nn
@@ -401,14 +402,12 @@ def do_turn_alphazeroagent(mcts, board):
     board = board.make_move_bvoi(maxi)
     return board
 
-kroopy = 0
 
 def do_turn_mcts(tree, board):
 
     time_limit = 15
     global deductable_time
     global added_time
-    global kroopy
     i = 0
     deductable_time = 0
     added_time = 0
@@ -419,9 +418,6 @@ def do_turn_mcts(tree, board):
         end = time.time()
         if end - start - deductable_time + added_time > time_limit:
             break
-    
-    logging.info("Turn ended: %d", kroopy)
-    kroopy += 1
 
 
 
@@ -541,14 +537,52 @@ def play_game_opposite(mode="uct", distribution_mode="sample"):
     return board
 
 
+def simulate(node, dict):
+    path = []
+    invert_reward = False
+    while True:
+        path.append((node))
+        if node.is_terminal():
+            reward = node.reward()
+            reward = 1 - reward if invert_reward else reward
+            break
+        node = node.find_random_child()
+                #print(node.is_terminal())
+                #print(node.get_legal_moves(1 if node.is_max else -1))
+        invert_reward = not invert_reward
+    path2 = reversed(path)
+    for node in path2:
+        n = node.tup
+        n = [tuple(lst) for lst in n]
+        n = tuple(n)
+        if dict.get(n) is None:
+            dict[n] = (reward, 1)
+        else:
+            dict[n] = ((dict[n][0]*dict[n][1] + reward)/(dict[n][1] + 1), dict[n][1] + 1)
 
+
+def simulate_until_no_tomorrow(load = False):
+
+    if load:
+        f = open("weak_heuristic_othello", "rb")
+        result_dict = pickle.load(f)
+        f.close()
+    else:
+        result_dict = {}
+
+    init = new_othello_board()
+    for _ in range(10):
+        simulate(init, result_dict)
+    f = open("weak_heuristic_othello", "wb")
+    pickle.dump(result_dict, f)
+    f.close()
 
 if __name__ == "__main__":
 
 
+    simulate_until_no_tomorrow(load = True)
+    exit(0)
     global time_for_nn
-    
-    logging.info("Hajime masho!")
     alphazero_agent = NNetWrapper()
     alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
     #tree = play_game()
@@ -603,7 +637,6 @@ if __name__ == "__main__":
             if x == 0:
                 fail=1
         sum=sum-fail
-        logging.info("Game ended")
 
 
 
@@ -619,7 +652,6 @@ if __name__ == "__main__":
             if x == 0:
                 fail=1
         sum=sum-fail
-        logging.info("Game ended")
 
     print("Win_sum:", win_sum)
     end = time.time()
