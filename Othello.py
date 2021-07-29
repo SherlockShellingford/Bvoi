@@ -579,6 +579,11 @@ def simulate_until_no_tomorrow(load = False):
 
 if __name__ == "__main__":
 
+    m = MCTS(new_othello_board())
+    print(m.compute_max_probability([[(1,0.2),(4,0.6), (7, 1.0)],
+                                     [(-2, 0.1), (3, 0.5), (10, 1.0)],
+                                     [(0, 0.5), (5, 0.8), (11, 1.0)]], is_max = False))
+    exit(0)
 
     simulate_until_no_tomorrow(load = True)
     exit(0)

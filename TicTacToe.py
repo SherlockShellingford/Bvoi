@@ -50,7 +50,7 @@ def load_tictactoe_alphazero():
 class TicTacToeBoard(Node):
 
     def __init__(self, max, tup, turn, winner, terminal, meanvalue, depth):
-        standard_derv=(9-depth)*0.3/9
+        standard_derv=(10-depth)*0.3/10
         self.is_max=max
         self.tup=tup
         self.marked=0
@@ -62,8 +62,11 @@ class TicTacToeBoard(Node):
         self.hash = getrandbits(128)
         self.probability_density = lambda x : norm.pdf(x, loc=meanvalue, scale=standard_derv, size=None)
         self.buckets=[]
-        for i in np.linspace(0,1,15):
-            self.buckets.append(norm.ppf(i,loc=meanvalue, scale=standard_derv))
+        num_of_buckets = 13
+        j = 0
+        for i in np.linspace(0,1,num_of_buckets + 2):
+            self.buckets.append((norm.ppf(i,loc=meanvalue, scale=standard_derv), j/num_of_buckets))
+            j = j + 1
         self.buckets=self.buckets[1:-1]
         def dist(x):
             if self.buckets[0]>x:
@@ -315,13 +318,9 @@ if __name__ == "__main__":
 
     import time
 
-    simulate_until_no_tomorrow(load = True)
-    exit(0)
-
-
     start = time.time()
     sum = 100
-    for i in range(0,50):
+    for i in range(0,25):
         fail=0
         board=play_game(mode="bvoi-greedy", mode2= "uct")
         
@@ -334,7 +333,7 @@ if __name__ == "__main__":
             fail = 1
         sum=sum-fail
     print("mikapika")
-    for i in range(0,100):
+    for i in range(0,25):
         fail=0
         board=play_game(mode="uct", mode2= "bvoi-greedy")
         if board.reward() != 0.5:
