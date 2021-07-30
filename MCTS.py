@@ -122,8 +122,31 @@ class MCTS:
         for item in ret_dist:
             real_ret_dist.append( (item[0] , item[1] + culmative) )
             culmative += item[1]
-        if len(real_ret_dist) > 1 and real_ret_dist[1][0] == np.nan:
-            print("Crapa")
+        
+        if 2 * len(distributions) < len(real_ret_dist):
+            ratio_to_one = int(len(real_ret_dist) / len(distributions))
+            j = 0
+            i = ratio_to_one
+            approximated_ret_dist = []
+            while j < len(real_ret_dist):
+                if i > len(real_ret_dist):
+                    sum = 0
+                    for m in range(j, len(real_ret_dist)):
+                        sum += real_ret_dist[m][0]
+                    mean = sum / (len(real_ret_dist) - j)
+                    approximated_ret_dist.append((mean, 1.0))
+                else:
+                    sum = 0
+                    for m in range(j, i):
+                        sum += real_ret_dist[m][0]
+                    mean = sum / ratio
+                    approximated_ret_dist.append((mean, real_ret_dist[m][1]))
+                j += ratio
+                i += ratio
+            return approximated_ret_dist
+                
+            
+        
         return real_ret_dist
 
 
@@ -131,12 +154,8 @@ class MCTS:
 
     def _compute_Us(self, node, return_children=False):
 
-        random_checkup = False
         if node.marked == 0:
-            if random.random() < 0.3:
-                random_checkup = True
-            else:
-                return self.node_to_dry_Us[node]
+            return self.node_to_dry_Us[node]
 
 
         node.marked = max([node.marked - 1, 0])
@@ -146,8 +165,6 @@ class MCTS:
         #    else:
         #        return [1 for b in node.buckets]
         if self.children.get(node) is None or len(self.children.get(node)) == 0:
-            if random_checkup:
-                return [(node.meanvalue, 1.0)]
             return node.buckets
 
         is_max=node.is_max
@@ -162,15 +179,6 @@ class MCTS:
         for c in self.children[node]:
             child_dist.append(self._compute_Us(c))
         ret = self.compute_max_probability(child_dist, is_max = is_max)
-        if random_checkup:
-            for i in range(len(ret)):
-                if ret[i] != self.node_to_dry_Us[node][i]:
-                    print("OH NOOOOOOO!!!!")
-                    print(ret)
-                    print(self.node_to_dry_Us[node])
-                    for c in self.children[node]:
-                        print("kookoo")
-                    moomoo = rooroo
         return ret
 
     def gather_leaves(self, node):

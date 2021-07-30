@@ -31,12 +31,16 @@ class OthelloBoard(Node):
         self.marked = False
         self.turn=turn
         self.winner=winner
+        self.hash = getrandbits(128)
         self.terminal=terminal
         self.meanvalue=meanvalue
         self.depth=depth
         self.buckets=[]
-        for i in np.linspace(0,1,15):
-            self.buckets.append(norm.ppf(i,loc=meanvalue, scale=standard_derv))
+        num_of_buckets = 13
+        j = 0
+        for i in np.linspace(0,1,num_of_buckets + 2):
+            self.buckets.append((norm.ppf(i,loc=meanvalue, scale=standard_derv), j/num_of_buckets))
+            j = j + 1
         self.buckets=self.buckets[1:-1]
         
 
@@ -243,7 +247,7 @@ class OthelloBoard(Node):
                 ret.winner=None
         if distribution_mode=="sample":
             to_simulate = OthelloBoard(not board.is_max, tup, turn, None, None, 0, board.depth + 1)
-            terminal = not ret.has_legal_moves(1 if to_simulate.is_max else -1)
+            terminal = not to_simulate.has_legal_moves(1 if to_simulate.is_max else -1)
             if terminal:
                 winner = _find_winner(to_simulate)
             else:
@@ -555,7 +559,7 @@ def simulate_until_no_tomorrow(load = False, start = 0):
     else:
         result_dict = {}
     init = new_othello_board()
-    for _ in range(100000):
+    for _ in range(300000):
         simulate(init, result_dict, start = start)
     f = open("weak_heuristic_othello", "wb")
     pickle.dump(result_dict, f)
@@ -563,7 +567,7 @@ def simulate_until_no_tomorrow(load = False, start = 0):
 
 if __name__ == "__main__":
 
-    import time
+    #import time
     #start = time.time()
     #simulate_until_no_tomorrow(load = True, start = start)
     #print("Finished")
