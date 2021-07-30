@@ -139,10 +139,10 @@ class MCTS:
                     sum = 0
                     for m in range(j, i):
                         sum += real_ret_dist[m][0]
-                    mean = sum / ratio
+                    mean = sum / ratio_to_one
                     approximated_ret_dist.append((mean, real_ret_dist[m][1]))
-                j += ratio
-                i += ratio
+                j += ratio_to_one
+                i += ratio_to_one
             return approximated_ret_dist
                 
             

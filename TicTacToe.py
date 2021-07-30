@@ -318,6 +318,9 @@ if __name__ == "__main__":
     #alphazero_agent.load_checkpoint('./pretrained_models/alternative', 'best-25eps-25sim-10epch.pth.tar')
 
     import time
+
+
+
     #start = time.time()
     #simulate_until_no_tomorrow(load = True)
     #print("Finished")
