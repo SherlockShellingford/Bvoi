@@ -38,7 +38,7 @@ class MCTS:
         self.BSM_N = 1
         self.node_to_path_CVIBES = dict()
         self.node_to_dry_Us = dict()
-        self.node_to_dry_Us[root] = [root.meanvalue for b in root.buckets]
+        self.node_to_dry_Us[root] = [(root.meanvalue, 1)]
 
 
     def _mark_ancestors(self, node):
@@ -55,6 +55,78 @@ class MCTS:
     def _compute_Us_for_all_children(self, node, s):
         self._mark_all_S_ancestors(s)
         return self._compute_Us(node, return_children=True)
+
+    # Example:
+    # distributions = [[(4, 0.2), (6, 0.5), (7, 1.0)], [(3, 0.4), (4, 0.6), (5, 1.0)]]
+    def compute_max_probability(self, distributions,  is_max = True):
+        queue = PriorityQueue()
+        ret_dist = []
+        chance_of_every_distribution_to_be_lower_than_current_value = []
+        num_of_chances_that_are_not_one_anymore = 0
+        multiplied_chance = 1
+        last_diff = 1
+        last_distribution_cdf_used = 1
+
+        for i in range(len(distributions)):
+            if is_max:
+                queue.put(PrioritizedItem(distributions[i][0][0], (i, distributions[i][0][1], 0)))
+            else:
+                if len(distributions[i]) == 1:
+                    chance = 1
+                else:
+                    chance = 1 - distributions[i][-2][1]
+                queue.put(PrioritizedItem(-distributions[i][-1][0], (i, chance, len(distributions[i]) - 1)))
+            chance_of_every_distribution_to_be_lower_than_current_value.append(1)
+        while not queue.empty():
+            lowest_or_highest_value = queue.get()
+
+            i = lowest_or_highest_value.item[0]
+            j = lowest_or_highest_value.item[2]
+            #The chance for all other distriubutions to be lower/equal than the value, and for the distribution that contained it to be that exact value
+            diff = (lowest_or_highest_value.item[1] - chance_of_every_distribution_to_be_lower_than_current_value[i])
+            cdf_of_current_distribution = chance_of_every_distribution_to_be_lower_than_current_value[lowest_or_highest_value.item[0]]
+
+
+            if num_of_chances_that_are_not_one_anymore == len(distributions):
+                multiplied_chance *= diff * last_distribution_cdf_used  / (last_diff * cdf_of_current_distribution)
+                last_distribution_cdf_used = lowest_or_highest_value.item[1]
+                last_diff = diff
+                ret_dist.append([lowest_or_highest_value.priority, multiplied_chance])
+
+            else:
+                if chance_of_every_distribution_to_be_lower_than_current_value[i] == 1:
+                    multiplied_chance *= lowest_or_highest_value.item[1] / chance_of_every_distribution_to_be_lower_than_current_value[i]
+                    num_of_chances_that_are_not_one_anymore += 1
+                    if num_of_chances_that_are_not_one_anymore == len(distributions):
+                        ret_dist.append([lowest_or_highest_value.priority, multiplied_chance])
+
+            chance_of_every_distribution_to_be_lower_than_current_value[i] = lowest_or_highest_value.item[1]
+
+
+            if is_max and j < len(distributions[i]) - 1:
+                chance = distributions[i][j + 1][1]
+                queue.put(PrioritizedItem(distributions[i][j + 1][0], (i, chance, j + 1)))
+            elif not is_max and j > 0:
+                if j == 1:
+                    chance = 1
+                else:
+                    chance = 1 - distributions[i][j - 2][1]
+                queue.put(PrioritizedItem(-distributions[i][j - 1][0], (i, chance, j - 1)))
+
+        if not is_max:
+            ret_dist = reversed(ret_dist)
+            ret_dist = [[-item[0], item[1]]  for item in ret_dist]
+
+        culmative = 0
+        real_ret_dist = []
+        for item in ret_dist:
+            real_ret_dist.append( (item[0] , item[1] + culmative) )
+            culmative += item[1]
+        if len(real_ret_dist) > 1 and real_ret_dist[1][0] == np.nan:
+            print("Crapa")
+        return real_ret_dist
+
+
 
 
     def _compute_Us(self, node, return_children=False):
@@ -75,7 +147,7 @@ class MCTS:
         #        return [1 for b in node.buckets]
         if self.children.get(node) is None or len(self.children.get(node)) == 0:
             if random_checkup:
-                return [node.meanvalue for b in node.buckets]
+                return [(node.meanvalue, 1.0)]
             return node.buckets
 
         is_max=node.is_max
@@ -89,21 +161,7 @@ class MCTS:
         child_dist=[]
         for c in self.children[node]:
             child_dist.append(self._compute_Us(c))
-        ret=[]
-        for i in range(len(node.buckets)):
-            if is_max:
-                max_or_min=np.NINF
-            else:
-                max_or_min=np.PINF
-            for c in child_dist:
-                if is_max:
-                    if max_or_min<c[i]:
-                        max_or_min=c[i]
-                else:
-                    if max_or_min>c[i]:
-                        max_or_min=c[i]
-            ret.append(max_or_min)
-
+        ret = self.compute_max_probability(child_dist, is_max = is_max)
         if random_checkup:
             for i in range(len(ret)):
                 if ret[i] != self.node_to_dry_Us[node][i]:
@@ -123,7 +181,11 @@ class MCTS:
             ret = ret + self.gather_leaves(c)
         return ret
 
-
+    def _compute_mean_of_distribution(self, dist):
+        mean = dist[0][0] * dist[0][1]
+        for i in range(1, len(dist)):
+            mean += dist[i][0] * (dist[i][1] - dist[i - 1][1])
+        return mean
 
     def _compute_bvoi_of_child(self, Unode, Ucompare_against, is_alpha=False, is_max=True):
         sum = 0
@@ -132,15 +194,11 @@ class MCTS:
             is_max_coefficent=-1
 
         if not is_alpha:
-            for i in range(len(Unode)):
-                sum += max([is_max_coefficent*(Unode[i] - Ucompare_against[i]), 0])
-            sum = sum / len(Unode)
-            return sum
+            return max([is_max_coefficent*(self._compute_mean_of_distribution(Unode) - self._compute_mean_of_distribution(Ucompare_against)), 0])
+
         else:
-            for i in range(len(Unode)):
-                sum += max([is_max_coefficent*(Ucompare_against[i] - Unode[i]), 0])
-            sum = sum / len(Unode)
-            return sum
+            return max([is_max_coefficent*(self._compute_mean_of_distribution(Ucompare_against) - self._compute_mean_of_distribution(Unode)), 0])
+
 
     def chance_for_dist_biggersmaller_than_val(self, dist, val, bigger_mode=True):
         count=0
@@ -343,10 +401,16 @@ class MCTS:
     def _BVOI_select(self, node):
         if len(self.children[node]) == 1:
             for i in self.children[node]:
+                if i is None:
+                    print("Oish noo2")
+                    print(node.tup)
                 return i
 
         s=self._batch_gather_greedy(node)
         if len(s) == 0: #TODO ADD THIS!!!!!
+            if self.alpha[node] is None:
+                print("Oish noo3")
+                print(node.tup)
             return self.alpha[node]
         max=0
         max_child=None
@@ -366,6 +430,8 @@ class MCTS:
             if max<=c_bvoi:
                 max=c_bvoi
                 max_child=c
+        if max_child is None:
+            print("Oish noo")
         return max_child
 
 
@@ -405,7 +471,7 @@ class MCTS:
 
     def do_rollout(self, node):
         if self.node_to_dry_Us.get(node) is None:
-            self.node_to_dry_Us[node] = [node.meanvalue for b in node.buckets]
+            self.node_to_dry_Us[node] = [(node.meanvalue,1)]
 
         path = self._select(node)
         leaf = path[-1]
@@ -456,25 +522,25 @@ class MCTS:
 
         if node.is_max:
             changed = False
-            max=[np.NINF]
+            max = np.NINF
             for c in self.children[node]:
-                if max[0] < self.node_to_dry_Us[c][0]:
+                if max < self.node_to_dry_Us[c][0][0]:
                     changed = True
-                    max =  self.node_to_dry_Us[c]
+                    max =  self.node_to_dry_Us[c][0][0]
             if changed:
-                self.node_to_dry_Us[node] = max
+                self.node_to_dry_Us[node] = [(max,1.0)]
                 if self.child_to_father.get(node) is not None:
                     self.update_dry_Us(self.child_to_father.get(node))
         else:
             changed = False
 
-            min=[np.inf]
+            min=np.inf
             for c in self.children[node]:
-                if self.node_to_dry_Us[c][0] < min[0]:
+                if self.node_to_dry_Us[c][0][0] < min:
                     changed = True
-                    min = self.node_to_dry_Us[c]
+                    min = self.node_to_dry_Us[c][0][0]
             if changed:
-                self.node_to_dry_Us[node] = min
+                self.node_to_dry_Us[node] = [(min, 1.0)]
                 if self.child_to_father.get(node) is not None:
                     self.update_dry_Us(self.child_to_father.get(node))
 
@@ -508,7 +574,7 @@ class MCTS:
 
             #Markdown algorithm
             self.child_to_father[n] = node
-            self.node_to_dry_Us[n] = [n.meanvalue for b in n.buckets]
+            self.node_to_dry_Us[n] = [(n.meanvalue,1.0)]
 
 
 
