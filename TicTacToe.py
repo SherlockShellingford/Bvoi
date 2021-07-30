@@ -298,12 +298,13 @@ def simulate_until_no_tomorrow(load = False):
     if load:
         f = open("weak_heuristic", "rb")
         result_dict = pickle.load(f)
+        print(result_dict[new_tic_tac_toe_board().tup])
         f.close()
     else:
         result_dict = {}
 
     init = new_tic_tac_toe_board()
-    for _ in range(10):
+    for _ in range(50000000):
         simulate(init, result_dict)
     f = open("weak_heuristic", "wb")
     pickle.dump(result_dict, f)
@@ -314,8 +315,10 @@ if __name__ == "__main__":
     #alphazero_agent.load_checkpoint('./pretrained_models/alternative', 'best-25eps-25sim-10epch.pth.tar')
 
     import time
-
+    start = time.time()
     simulate_until_no_tomorrow(load = True)
+    print("Finished")
+    print(time.time() - start)
     exit(0)
 
 

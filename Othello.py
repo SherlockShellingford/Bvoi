@@ -34,28 +34,11 @@ class OthelloBoard(Node):
         self.terminal=terminal
         self.meanvalue=meanvalue
         self.depth=depth
-        self.hash = getrandbits(128)
-        self.probability_density = lambda x : norm.pdf(x, loc=meanvalue, scale=standard_derv, size=None)
         self.buckets=[]
         for i in np.linspace(0,1,15):
             self.buckets.append(norm.ppf(i,loc=meanvalue, scale=standard_derv))
         self.buckets=self.buckets[1:-1]
-        def dist(x):
-            if self.buckets[0]>x:
-                return self.buckets[0]
-            for i in range(1, len(self.buckets)):
-
-                if x<self.buckets[i]:
-                    d1=x-self.buckets[i-1]
-                    d2=self.buckets[i]-x
-                    if d1>d2:
-                        return self.buckets[i-1]
-                    else:
-                        return self.buckets[i]
-            return self.buckets[-1]
-
-        self.distribution=lambda x : dist(norm.rvs(loc=meanvalue,scale=standard_derv, size=None))
-
+        
 
 
 
@@ -210,7 +193,7 @@ class OthelloBoard(Node):
             return state
         turn = not board.turn
         ret = OthelloBoard(not board.is_max, tup, turn, None, None, 0, board.depth + 1)
-        ret.terminal = len(ret.get_legal_moves(1 if ret.is_max else -1)) == 0
+        ret.terminal = not ret.has_legal_moves(1 if ret.is_max else -1)
         if ret.terminal:
             ret.winner = _find_winner(ret)
         else:
@@ -230,7 +213,7 @@ class OthelloBoard(Node):
         turn = not board.turn
         if distribution_mode=="none":
             ret = OthelloBoard(not board.is_max, tup, turn, None, None, 0, board.depth + 1)
-            ret.terminal = len(ret.get_legal_moves(1 if ret.is_max else -1)) == 0
+            ret.terminal = not ret.has_legal_moves(1 if ret.is_max else -1)
             if ret.terminal:
                 ret.winner = _find_winner(ret)
             else:
@@ -253,14 +236,14 @@ class OthelloBoard(Node):
             if not not board.is_max:
                 meanvalue = -meanvalue
             ret = OthelloBoard(not board.is_max, tup, turn, None, None, meanvalue, board.depth + 1)
-            ret.terminal = len(ret.get_legal_moves(1 if ret.is_max else -1)) == 0
+            ret.terminal = not ret.has_legal_moves(1 if ret.is_max else -1)
             if ret.terminal:
                 ret.winner = _find_winner(ret)
             else:
                 ret.winner=None
         if distribution_mode=="sample":
             to_simulate = OthelloBoard(not board.is_max, tup, turn, None, None, 0, board.depth + 1)
-            terminal = len(to_simulate.get_legal_moves(1 if to_simulate.is_max else -1)) == 0
+            terminal = not ret.has_legal_moves(1 if to_simulate.is_max else -1)
             if terminal:
                 winner = _find_winner(to_simulate)
             else:
@@ -276,12 +259,8 @@ class OthelloBoard(Node):
             global added_time
             start = time.time()
             sim_result_vector = []
-            print(tup)
             for i in range(num_sims):
-                #sum += mcts.simulate(to_simulate, invert_reward = False)
-                sim_result_vector.append(mcts.simulate(to_simulate, invert_reward = False))
-            print(sim_result_vector)
-            rooroo=kookoo
+                sum += mcts.simulate(to_simulate, invert_reward = False)
             if not board.is_max:
                 meanvalue = sum / num_sims
             else:
@@ -537,7 +516,7 @@ def play_game_opposite(mode="uct", distribution_mode="sample"):
     return board
 
 
-def simulate(node, dict):
+def simulate(node, dict, start = 0):
     path = []
     invert_reward = False
     while True:
@@ -546,22 +525,28 @@ def simulate(node, dict):
             reward = node.reward()
             reward = 1 - reward if invert_reward else reward
             break
+        
         node = node.find_random_child()
                 #print(node.is_terminal())
                 #print(node.get_legal_moves(1 if node.is_max else -1))
+        
         invert_reward = not invert_reward
     path2 = reversed(path)
+    
     for node in path2:
         n = node.tup
         n = [tuple(lst) for lst in n]
         n = tuple(n)
+        
         if dict.get(n) is None:
             dict[n] = (reward, 1)
         else:
             dict[n] = ((dict[n][0]*dict[n][1] + reward)/(dict[n][1] + 1), dict[n][1] + 1)
+        
 
 
-def simulate_until_no_tomorrow(load = False):
+
+def simulate_until_no_tomorrow(load = False, start = 0):
 
     if load:
         f = open("weak_heuristic_othello", "rb")
@@ -569,24 +554,26 @@ def simulate_until_no_tomorrow(load = False):
         f.close()
     else:
         result_dict = {}
-
     init = new_othello_board()
-    for _ in range(10):
-        simulate(init, result_dict)
+    for _ in range(100000):
+        simulate(init, result_dict, start = start)
     f = open("weak_heuristic_othello", "wb")
     pickle.dump(result_dict, f)
     f.close()
 
 if __name__ == "__main__":
 
-
-    simulate_until_no_tomorrow(load = True)
+    import time
+    start = time.time()
+    simulate_until_no_tomorrow(load = True, start = start)
+    print("Finished")
+    print(time.time() - start)
     exit(0)
     global time_for_nn
     alphazero_agent = NNetWrapper()
     alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
     #tree = play_game()
-    import time
+    
     legal_moves_test()
 
     real_best = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0], [0, -1, 1, 1, -1, 0], [0, 1, 1, -1, 1, 0], [0, 0, 1, 1, 0, 0],
