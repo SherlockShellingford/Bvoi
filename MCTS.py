@@ -9,6 +9,7 @@ from collections import defaultdict
 import math
 import numpy as np
 import random
+import time
 from scipy.integrate import quad
 from CVIBES.PrioritizedItem import PrioritizedItem
 from queue import PriorityQueue
@@ -16,7 +17,7 @@ from queue import PriorityQueue
 class MCTS:
     "Monte Carlo tree searcher. First rollout the tree then choose a move."
 
-    def __init__(self, root, exploration_weight=1, mode="uct", distribution_mode="sample"):
+    def __init__(self, root, exploration_weight=1, mode="uct", distribution_mode="weak heuristic"):
         self.Q = defaultdict(int)  # total reward of each node
         self.N = defaultdict(int)  # total visit count for each node
         self.children = dict()  # children of each node
@@ -28,6 +29,8 @@ class MCTS:
         self.beta1=dict()
         self.mode=mode
         self.distribution_mode=distribution_mode
+        if mode == "c-vibes":
+            self.distribution_mode="weak heuristic"
         self.bvoi_counter=5
         self.bvoi_freq=5
         self.last_chosen_by_bvoi=None
@@ -38,7 +41,7 @@ class MCTS:
         self.BSM_N = 1
         self.node_to_path_CVIBES = dict()
         self.node_to_dry_Us = dict()
-        self.node_to_dry_Us[root] = [(root.meanvalue, 1)]
+        self.node_to_dry_Us[root] = [(root.meanvalue, 1.0)]
 
 
     def _mark_ancestors(self, node):
@@ -54,7 +57,11 @@ class MCTS:
 
     def _compute_Us_for_all_children(self, node, s):
         self._mark_all_S_ancestors(s)
-        return self._compute_Us(node, return_children=True)
+        return self._compute_Us(node, s, return_children=True)
+
+    def _compute_Us_for_node(self, node, s):
+        self._mark_all_S_ancestors(s)
+        return self._compute_Us(node, s, return_children=False)[0]
 
     # Example:
     # distributions = [[(4, 0.2), (6, 0.5), (7, 1.0)], [(3, 0.4), (4, 0.6), (5, 1.0)]]
@@ -66,8 +73,9 @@ class MCTS:
         multiplied_chance = 1
         last_diff = 1
         last_distribution_cdf_used = 1
-
         for i in range(len(distributions)):
+            if len(distributions) ==0 or len(distributions[i]) == 0 or len(distributions[i][0]) == 0:
+                print("Zura")
             if is_max:
                 queue.put(PrioritizedItem(distributions[i][0][0], (i, distributions[i][0][1], 0)))
             else:
@@ -89,13 +97,17 @@ class MCTS:
 
             if num_of_chances_that_are_not_one_anymore == len(distributions):
                 multiplied_chance *= diff * last_distribution_cdf_used  / (last_diff * cdf_of_current_distribution)
+
+
                 last_distribution_cdf_used = lowest_or_highest_value.item[1]
                 last_diff = diff
                 ret_dist.append([lowest_or_highest_value.priority, multiplied_chance])
 
             else:
+
+                multiplied_chance *= lowest_or_highest_value.item[1] / chance_of_every_distribution_to_be_lower_than_current_value[i]
+
                 if chance_of_every_distribution_to_be_lower_than_current_value[i] == 1:
-                    multiplied_chance *= lowest_or_highest_value.item[1] / chance_of_every_distribution_to_be_lower_than_current_value[i]
                     num_of_chances_that_are_not_one_anymore += 1
                     if num_of_chances_that_are_not_one_anymore == len(distributions):
                         ret_dist.append([lowest_or_highest_value.priority, multiplied_chance])
@@ -122,27 +134,18 @@ class MCTS:
         for item in ret_dist:
             real_ret_dist.append( (item[0] , item[1] + culmative) )
             culmative += item[1]
-        
-        if 2 * len(distributions) < len(real_ret_dist):
-            ratio_to_one = int(len(real_ret_dist) / len(distributions))
-            j = 0
-            i = ratio_to_one
-            approximated_ret_dist = []
-            while j < len(real_ret_dist):
-                if i > len(real_ret_dist):
-                    sum = 0
-                    for m in range(j, len(real_ret_dist)):
-                        sum += real_ret_dist[m][0]
-                    mean = sum / (len(real_ret_dist) - j)
-                    approximated_ret_dist.append((mean, 1.0))
-                else:
-                    sum = 0
-                    for m in range(j, i):
-                        sum += real_ret_dist[m][0]
-                    mean = sum / ratio_to_one
-                    approximated_ret_dist.append((mean, real_ret_dist[m][1]))
-                j += ratio_to_one
-                i += ratio_to_one
+
+
+        if 20 < len(real_ret_dist):
+            while 20 < len(real_ret_dist):
+                approximated_ret_dist = [real_ret_dist[0]]
+                i = 1
+                while i < len(real_ret_dist) - 1:
+                    if math.fabs(approximated_ret_dist[-1][1] - real_ret_dist[i][1]) > (1 / len(real_ret_dist)):
+                        approximated_ret_dist.append(real_ret_dist[i])
+                    i = i + 1
+                approximated_ret_dist.append(real_ret_dist[-1])
+                real_ret_dist = approximated_ret_dist
             return approximated_ret_dist
                 
             
@@ -152,20 +155,19 @@ class MCTS:
 
 
 
-    def _compute_Us(self, node, return_children=False):
-
-        if node.marked == 0:
-            return self.node_to_dry_Us[node]
+    def _compute_Us(self, node, s, return_children=False):
 
 
-        node.marked = max([node.marked - 1, 0])
         #if node.terminal:
         #    if node.is_max:
         #        return [-1 for b in node.buckets]
         #    else:
         #        return [1 for b in node.buckets]
         if self.children.get(node) is None or len(self.children.get(node)) == 0:
-            return node.buckets
+            if node in s:
+                return node.buckets, False
+            else:
+                return [(node.meanvalue, 1.0)], True
 
         is_max=node.is_max
 
@@ -173,13 +175,23 @@ class MCTS:
         if return_children:
             ret = dict()
             for c in self.children[node]:
-                ret[c] = self._compute_Us(c)
+                ret[c] = self._compute_Us(c, s)[0]
             return ret
         child_dist=[]
+        is_single_value = True
         for c in self.children[node]:
-            child_dist.append(self._compute_Us(c))
-        ret = self.compute_max_probability(child_dist, is_max = is_max)
-        return ret
+            d, is_single_value_child = self._compute_Us(c,s)
+            child_dist.append(d)
+            is_single_value = is_single_value and is_single_value_child
+        if is_single_value:
+            if is_max:
+                ret = [(max([item[0][0] for item in child_dist]), 1.0)]
+            else:
+                ret = [(min([item[0][0] for item in child_dist]), 1.0)]
+
+        else:
+            ret = self.compute_max_probability(child_dist, is_max = is_max)
+        return ret, is_single_value
 
     def gather_leaves(self, node):
         if self.children.get(node) is None:
@@ -209,15 +221,15 @@ class MCTS:
 
 
     def chance_for_dist_biggersmaller_than_val(self, dist, val, bigger_mode=True):
-        count=0
+        sum=0
         len_dist=len(dist)
         for i in range(len_dist):
-            if dist[i]>val:
+            if dist[i][0]>val:
                 break
-            count = count + 1
+            sum = dist[i][1]
         if not bigger_mode:
-            return count/len_dist
-        return (len_dist-count)/len_dist
+            return sum
+        return 1-sum
 
 
     def _S_gather_rec_CVIBES(self, node, v, prob_table, prob_of_root, path_table, S, path):
@@ -228,42 +240,39 @@ class MCTS:
             path_table[node] = path + [node]
         else:
             for c in self.children[node]:
+                if prob_table.get(c.__hash__(), v) is None:
+                    print("Jaja")
+                    self._store_probabilities_rec(node, {}, 0.6)
                 if prob_table[c.__hash__(), v] == prob_of_root:
                    S = self._S_gather_rec_CVIBES(c,v,prob_table,prob_of_root,path_table, S, path + [node])
         return S
 
 
+
     def _store_probabilities(self, node, s, table, v, bigger_mode=True):
+        return self._store_probabilities_rec(node, table, v, bigger_mode)
 
-        if self.children.get(node) is None:
-            if node.__hash__() in s:
 
-                table[node.__hash__(), v] = self.chance_for_dist_biggersmaller_than_val(node.buckets, v, bigger_mode=bigger_mode)
-                return node.buckets
-            else:
-                table[node.__hash__(), v] = self.chance_for_dist_biggersmaller_than_val([node.meanvalue for b in node.buckets], v, bigger_mode=bigger_mode)
-                return [node.meanvalue for b in node.buckets]
+    def _store_probabilities_rec(self, node, table, v, bigger_mode=True):
+
+
+        if self.children.get(node) is None or node.terminal:
+            table[node.__hash__(), v] = self.chance_for_dist_biggersmaller_than_val(node.buckets, v, bigger_mode=bigger_mode)
+            return node.buckets
+
         is_max=node.is_max
         child_dist=[]
         for c in self.children[node]:
-            Us_c = self._store_probabilities(c, s, table, v, bigger_mode=bigger_mode)
+            Us_c = self._store_probabilities_rec(c, table, v, bigger_mode=bigger_mode)
+            if len(Us_c) == 0:
+                while True:
+                    print("Shit")
+                    self._store_probabilities_rec(c, table, v, bigger_mode=bigger_mode)
             child_dist.append(Us_c)
-        ret=[]
-        for i in range(len(node.buckets)):
-            if is_max:
-                max_or_min=np.NINF
-            else:
-                max_or_min=np.PINF
-            for c in child_dist:
-                if is_max:
-                    if max_or_min<c[i]:
-                        max_or_min=c[i]
-                else:
-                    if max_or_min>c[i]:
-                        max_or_min=c[i]
-            ret.append(max_or_min)
+        ret=self.compute_max_probability(child_dist, is_max = is_max)
 
-        table[node.__hash__(), v] = self.chance_for_dist_biggersmaller_than_val(ret, v, bigger_mode=bigger_mode)
+        x = self.chance_for_dist_biggersmaller_than_val(ret, v, bigger_mode=bigger_mode)
+        table[node.__hash__(), v] = x
         return ret
 
 
@@ -272,7 +281,7 @@ class MCTS:
     def _find_k_best_VPI(self, s, k, alpha, c, is_alpha_children):
         queue = PriorityQueue()
         for leaf in s:
-            item = PrioritizedItem(-1 * self._compute_bvoi_of_child(self._compute_Us(c,[leaf]),self._compute_Us(alpha,[leaf]),  is_alpha = is_alpha_children, is_max = not alpha.is_max), leaf)
+            item = PrioritizedItem(-1 * self._compute_bvoi_of_child(self._compute_Us_for_node(c,[leaf]),self._compute_Us_for_node(alpha,[leaf]),  is_alpha = is_alpha_children, is_max = not alpha.is_max), leaf)
             queue.put(item)
         return queue.queue
 
@@ -325,7 +334,7 @@ class MCTS:
                                 maxV_tag = v_stash[j]
                                 maxV = v_stash[i]
                             max_c = c
-        if maxV_tag is None:
+        if max < 0.05:
             return [node, alpha_node]
         #Lines 7-16
         S1 = self._S_gather_rec_CVIBES(alpha_node, maxV,prob_dict, prob_dict[alpha_node.__hash__(), maxV], self.node_to_path_CVIBES, [], [] )
@@ -387,7 +396,7 @@ class MCTS:
         s=[]
         alpha_node = self.alpha[node]
         beta1_node = self.beta1[node]
-        alpha_Us = self._compute_Us(alpha_node)
+        alpha_Us = self._compute_Us(alpha_node, [])[0]
 
         leaves = self.gather_leaves(node)
         for l in leaves:
@@ -401,7 +410,6 @@ class MCTS:
                                                              is_alpha=True, is_max=node.is_max)
                     if c_bvoi>0:
                         s.append(l)
-
         return s
 
 
@@ -460,13 +468,16 @@ class MCTS:
                 return float("-inf")  # avoid unseen moves
             return self.Q[n] / self.N[n]  # average reward
 
-        #for c in self.children[node]:
-        #    print(c.tup)
-        #    print(self.Q[c])
-        #    print(self.N[c])
-        #    print(c.meanvalue)
-        #    x=self._compute_Us(c,[])
-        #    print(x)
+        for c in self.children[node]:
+            break
+            print(c.tup)
+            print(self.Q[c])
+            print(self.N[c])
+            print(c.meanvalue)
+            print(self._compute_Us(c,[]))
+            for c2 in self.children[c]:
+                print(c2.tup)
+                print(self._compute_Us(c2,[]))
             #if x[0]>2:
             #    print("Chikachika")
             #    while True:
@@ -484,11 +495,17 @@ class MCTS:
         path = self._select(node)
         leaf = path[-1]
         self._expand(leaf)
-        reward = self.simulate(leaf)
-        self._backpropagate(path, reward)
+        if self.mode == "c-vibes":
+            for _ in range(self.BSM_N):
+                reward = self.simulate(leaf)
+                self._backpropagate(path, reward)
+        else:
+            reward = self.simulate(leaf)
+            self._backpropagate(path, reward)
 
     def _select(self, node):
         "Find an unexplored descendent of `node`"
+        start = time.time()
         path = []
         first=True
 
@@ -496,11 +513,13 @@ class MCTS:
             path.append(node)
             if node not in self.children or not self.children[node]:
                 # node is either unexplored or terminal
+
                 return path
             unexplored = self.children[node] - self.children.keys()
             if unexplored:
                 n = unexplored.pop()
                 path.append(n)
+                print(time.time() - start)
                 return path
             if self.mode == "uct":
                 node = self._uct_select(node)
@@ -515,7 +534,8 @@ class MCTS:
 
             elif self.mode == "bvoi-greedy":
                 if first:
-                    if self.bvoi_counter==self.bvoi_freq:
+                    if self.bvoi_counter % self.bvoi_freq == 0:
+                        print("activated")
                         self.bvoi_counter=0
                         node = self._BVOI_select(node)
                         self.last_chosen_by_bvoi=node
@@ -526,31 +546,36 @@ class MCTS:
                 else:
                     node = self._uct_select(node)
 
-    def update_dry_Us(self, node):
+    def update_dry_Us(self, node, is_a_leaf = False, last_changed_value = 1000):
+
+        previous_value = self.node_to_dry_Us[node][0][0]
 
         if node.is_max:
             changed = False
-            max = np.NINF
+            max = self.node_to_dry_Us[node][0][0]
+            if is_a_leaf or self.node_to_dry_Us[node][0][0] == last_changed_value:
+                max = np.NINF
             for c in self.children[node]:
                 if max < self.node_to_dry_Us[c][0][0]:
                     changed = True
                     max =  self.node_to_dry_Us[c][0][0]
-            if changed:
+            if changed or is_a_leaf:
                 self.node_to_dry_Us[node] = [(max,1.0)]
                 if self.child_to_father.get(node) is not None:
-                    self.update_dry_Us(self.child_to_father.get(node))
+                    self.update_dry_Us(self.child_to_father.get(node), last_changed_value=previous_value)
         else:
             changed = False
-
-            min=np.inf
+            min=self.node_to_dry_Us[node][0][0]
+            if is_a_leaf or self.node_to_dry_Us[node][0][0] == last_changed_value:
+                min = np.inf
             for c in self.children[node]:
                 if self.node_to_dry_Us[c][0][0] < min:
                     changed = True
                     min = self.node_to_dry_Us[c][0][0]
-            if changed:
+            if changed or is_a_leaf:
                 self.node_to_dry_Us[node] = [(min, 1.0)]
                 if self.child_to_father.get(node) is not None:
-                    self.update_dry_Us(self.child_to_father.get(node))
+                    self.update_dry_Us(self.child_to_father.get(node), last_changed_value=previous_value)
 
 
     def _expand(self, node):
@@ -561,6 +586,7 @@ class MCTS:
             children = node.find_children_bvoi(distribution_mode=self.distribution_mode)
         else:
             children = node.find_children()
+
 
         self.children[node]=children
         is_max=node.is_max
@@ -586,18 +612,18 @@ class MCTS:
 
 
 
-            if (is_max and n.meanvalue>max)  or (not is_max and n.meanvalue<max):
+            if (is_max and n.meanvalue>max)  or (not is_max and n.meanvalue<=max):
                 second_to_max=max
                 second_to_max_c=max_c
                 max=n.meanvalue
                 max_c=n
             else:
-                if (is_max and n.meanvalue>second_to_max) or (not is_max and n.meanvalue<second_to_max):
+                if (is_max and n.meanvalue>=second_to_max) or (not is_max and n.meanvalue<=second_to_max):
                     second_to_max=n.meanvalue
                     second_to_max_c=n
         self.alpha[node]=max_c
         self.beta1[node]=second_to_max_c
-        self.update_dry_Us(node)
+        self.update_dry_Us(node, is_a_leaf = True)
 
 
     def simulate(self, node, invert_reward=True):
@@ -607,6 +633,7 @@ class MCTS:
         #print(node.get_legal_moves(1 if node.is_max else -1))
         while True:
             if node.is_terminal():
+                reward = node.reward()
                 reward = node.reward()
                 return 1 - reward if invert_reward else reward
             if self.mode!="uct":
@@ -619,6 +646,7 @@ class MCTS:
 
     def _backpropagate(self, path, reward):
         "Send the reward back up to the ancestors of the leaf"
+        pass
         for node in reversed(path):
             self.N[node] += 1
             self.Q[node] += reward
@@ -684,4 +712,4 @@ class Node():
     @abstractmethod
     def __eq__(node1, node2):
         "Nodes must be comparable"
-        return True
+        return node1.tup == node2.tup
