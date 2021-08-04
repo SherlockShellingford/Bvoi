@@ -36,7 +36,7 @@ class OthelloBoard(Node):
         self.meanvalue=meanvalue
         self.depth=depth
         self.buckets=[]
-        num_of_buckets = 13
+        num_of_buckets = 8
         j = 0
         for i in np.linspace(0,1,num_of_buckets + 2):
             self.buckets.append((norm.ppf(i,loc=meanvalue, scale=standard_derv), j/num_of_buckets))
@@ -553,33 +553,33 @@ def simulate(node, dict, start = 0):
 def simulate_until_no_tomorrow(load = False, start = 0):
 
     if load:
-        f = open("weak_heuristic_othello", "rb")
+        f = open("weak_heuristic_othello_backup3", "rb")
         result_dict = pickle.load(f)
         f.close()
     else:
         result_dict = {}
     init = new_othello_board()
-    for _ in range(300000):
+    for _ in range(200000):
         simulate(init, result_dict, start = start)
-    f = open("weak_heuristic_othello", "wb")
+    f = open("weak_heuristic_othello_backup4", "wb")
     pickle.dump(result_dict, f)
     f.close()
 
 if __name__ == "__main__":
 
 
-    #import time
-    #start = time.time()
-    #simulate_until_no_tomorrow(load = True, start = start)
-    #print("Finished")
-    #print(time.time() - start)
-    #exit(0)
+    import time
+    start = time.time()
+    simulate_until_no_tomorrow(load = True, start = start)
+    print("Finished")
+    print(time.time() - start)
+    exit(0)
     
     global time_for_nn
     alphazero_agent = NNetWrapper()
     alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
     #tree = play_game()
-    
+    import time
     legal_moves_test()
 
     real_best = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0], [0, -1, 1, 1, -1, 0], [0, 1, 1, -1, 1, 0], [0, 0, 1, 1, 0, 0],
@@ -596,14 +596,21 @@ if __name__ == "__main__":
 
     X = np.asarray(one).astype('float32')
     X = np.reshape(X, (6, 6,))
+    time_lst = []
     start=time.time()
     for i in range(100):
       meanvalue_complete = alphazero_agent.predict(X)[1][0]  # 0 is pi and 1 is v
-    end=time.time()
-    time_for_nn = (end-start) / 100
+      end=time.time()
+      time_lst.append(end-start)
+      start = end
+    
+    time_lst.sort()
+    print(time_lst)
+    time_for_nn = time_lst[50]
     print("Time for nn:", time_for_nn)
     X = np.asarray(father).astype('float32')
     X = np.reshape(X, (6, 6,))
+    
 
     #pi, v = alphazero_agent.predict(X)  # 0 is pi and 1 is v
 
