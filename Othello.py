@@ -7,7 +7,7 @@ import logging
 import time
 import pickle
 from scipy.stats import norm
-from othello.keras.NNet import NNetWrapper
+#from othello.keras.NNet import NNetWrapper
 #from MCTSaz import MCTSaz
 from copy import deepcopy
 from othello.OthelloGame import OthelloGame
@@ -614,8 +614,8 @@ if __name__ == "__main__":
     n = tuple(n)
     
     global time_for_nn
-    alphazero_agent = NNetWrapper()
-    alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
+    #alphazero_agent = NNetWrapper()
+    #alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
     #tree = play_game()
     import time
     legal_moves_test()
@@ -632,20 +632,20 @@ if __name__ == "__main__":
     one = [[1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1],
               [1, 1, 1, 1, 1, 1]]
 
-    X = np.asarray(one).astype('float32')
-    X = np.reshape(X, (6, 6,))
-    time_lst = []
-    start=time.time()
-    for i in range(100):
-      meanvalue_complete = alphazero_agent.predict(X)[1][0]  # 0 is pi and 1 is v
-      end=time.time()
-      time_lst.append(end-start)
-      start = end
+    #X = np.asarray(one).astype('float32')
+    #X = np.reshape(X, (6, 6,))
+    #time_lst = []
+    #start=time.time()
+    #for i in range(100):
+    #  meanvalue_complete = alphazero_agent.predict(X)[1][0]  # 0 is pi and 1 is v
+    #  end=time.time()
+    #  time_lst.append(end-start)
+    #  start = end
     
-    time_lst.sort()
-    print(time_lst)
-    time_for_nn = time_lst[50]
-    print("Time for nn:", time_for_nn)
+    #time_lst.sort()
+    #print(time_lst)
+    #time_for_nn = time_lst[50]
+    #print("Time for nn:", time_for_nn)
     X = np.asarray(father).astype('float32')
     X = np.reshape(X, (6, 6,))
     
@@ -669,8 +669,8 @@ if __name__ == "__main__":
     win_sum = 0
     args = {
     "absolute_rollouts" : True,
-    "rollouts1" : 84,
-    "rollouts2" : 250
+    "rollouts1" : 50,
+    "rollouts2" : 150
     
     }
     
@@ -692,8 +692,8 @@ if __name__ == "__main__":
     
     args = {
     "absolute_rollouts" : True,
-    "rollouts1" : 250,
-    "rollouts2" : 84
+    "rollouts1" : 150,
+    "rollouts2" : 50
     }
     for i in range(0,5):
         fail=0
