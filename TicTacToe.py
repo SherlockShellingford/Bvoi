@@ -29,9 +29,13 @@ import pickle
 _TTTB = namedtuple("TicTacToeBoard", "tup turn winner terminal")
 
 states=dict()
+states2=dict()
 states_cache_bvoi=dict()
 previous_tree = None
-alphazero_agent=None
+alphazero_agent = None
+global weak_heuristic_dict
+weak_heuristic_dict = None
+
 
 
 def load_tictactoe_alphazero():
@@ -39,7 +43,13 @@ def load_tictactoe_alphazero():
     alphazero_agent.load_checkpoint('./pretrained_models','best-25eps-25sim-10epch.pth.tar')
 
 
+def sample(to_simulate,  num_sims = 25):
+    sum = 0
+    for i in range(num_sims):
+        sum += mcts.simulate(to_simulate, invert_reward=False)
 
+    meanvalue = sum / num_sims
+    return meanvalue
 
 
 
@@ -97,12 +107,12 @@ class TicTacToeBoard(Node):
             board.make_move(i) for i, value in enumerate(board.tup) if value == 0
         }
 
-    def find_children_bvoi(board, distribution_mode="NN"):
+    def find_children_bvoi(board, distribution_mode="sample"):
         if board.terminal:  # If the game is finished then no moves can be made
             return set()
         # Otherwise, you can make a move in each of the empty spots
         return {
-            board.make_move_bvoi(i) for i, value in enumerate(board.tup) if value == 0
+            board.make_move_bvoi(i, distribution_mode = distribution_mode) for i, value in enumerate(board.tup) if value == 0
         }
 
 
@@ -113,22 +123,29 @@ class TicTacToeBoard(Node):
         empty_spots = [i for i, value in enumerate(board.tup) if value == 0]
         return board.make_move(choice(empty_spots))
 
-    def find_random_child_bvoi(board, distribution_mode = "NN"):
+    def find_random_child_bvoi(board, distribution_mode = "sample"):
         if board.terminal:
             return None  # If the game is finished then no moves can be made
         empty_spots = [i for i, value in enumerate(board.tup) if value == 0]
-        return board.make_move_bvoi(choice(empty_spots))
+        return board.make_move_bvoi(choice(empty_spots), distribution_mode = distribution_mode)
 
     def reward(board):
         if not board.terminal:
             raise RuntimeError(f"reward called on nonterminal board {board}")
         if board.winner is board.turn:
             # It's your turn and you've already won. Should be impossible.
+            print(board.tup)
+            print(board.winner)
+            print(board.turn)
+            print(board.is_max)
+            print(board.terminal)
             raise RuntimeError(f"reward called on unreachable board {board}")
-        if board.turn is (not board.winner):
-            return 0  # Your opponent has just won. Bad.
         if board.winner is None:
             return 0.5  # Board is a tie
+
+        if board.turn is (not board.winner):
+            return 0  # Your opponent has just won. Bad.
+
         # The winner is neither True, False, nor None
         raise RuntimeError(f"board has unknown winner type {board.winner}")
 
@@ -148,7 +165,8 @@ class TicTacToeBoard(Node):
         return ret
 
 
-    def make_move_bvoi(board, index):
+
+    def make_move_bvoi(board, index, distribution_mode = "weak_heuristic"):
         tup = board.tup[:index] + ((1,) if board.turn else (-1,)) + board.tup[index + 1 :]
         state=states_cache_bvoi.get(tup)
         if state is not None:
@@ -158,20 +176,24 @@ class TicTacToeBoard(Node):
         is_terminal = (winner is not None) or not any(v == 0 for v in tup)
         to_simulate = TicTacToeBoard(not board.is_max, tup, turn, winner, is_terminal, 0 , board.depth + 1)
         mcts = MCTS(to_simulate)
-        sum = 0
-        num_sims = 25
 
-        for i in range(num_sims):
-            sum += mcts.simulate(to_simulate, invert_reward = False)
-
-        if not board.is_max:
-            meanvalue = sum / num_sims
-        else:
-            meanvalue = (num_sims - sum) / num_sims
-
+        if distribution_mode == "sample":
+            meanvalue = sample(to_simulate)
+        elif distribution_mode == "weak heuristic":
+            global weak_heuristic_dict
+            if weak_heuristic_dict.get(to_simulate.tup) is not None:
+                meanvalue = weak_heuristic_dict[to_simulate.tup][0]
+            else:
+                flipped_to_simulate = flip_board(to_simulate)
+                if weak_heuristic_dict.get(flipped_to_simulate.tup) is not None:
+                    meanvalue = 1 - weak_heuristic_dict[flipped_to_simulate.tup][0]
+                else:
+                    meanvalue = sample(to_simulate)
+        elif distribution_mode == 'none':
+            meanvalue = 0
         ret = TicTacToeBoard(not board.is_max, tup, turn, winner, is_terminal, meanvalue, board.depth + 1)
-
-        states[tup] = ret
+        if distribution_mode != 'none':
+            states_cache_bvoi[tup] = ret
         return ret
 
 
@@ -195,7 +217,7 @@ class TicTacToeBoard(Node):
         if not not board.is_max:
             meanvalue = -meanvalue
         ret = TicTacToeBoard(not board.is_max, tup, turn, winner, is_terminal, meanvalue , board.depth + 1)
-        states[tup] = ret
+        states_cache_bvoi[tup] = ret
         return ret
 
 
@@ -211,43 +233,47 @@ class TicTacToeBoard(Node):
         )
 
 
+def flip_board(board):
+    tup2 = []
+    for i in range(9):
+        tup2.append(-board.tup[i])
+
+    board = TicTacToeBoard(not board.is_max, tuple(tup2), not board.turn, board.winner, board.terminal, 0, board.depth)
+    return board
+
 def play_game(mode="uct", mode2 ="uct"):
     board = new_tic_tac_toe_board()
     tree = MCTS(board, mode=mode)
-    tree2 = MCTS(board, mode=mode2)
+    tree2 = MCTS(flip_board(board), mode=mode2)
     game=TicTacToeGame()
     #rival=MCTSaz(game,alphazero_agent)
     #prob, v = alphazero_agent.predict(np.asarray(board.tup).astype('float32').reshape((3, 3)))
 
     print(board.to_pretty_string())
     while True:
-        #row_col = input("enter row,col: ")
-        #row, col = map(int, row_col.split(","))
-        #index = 3 * (row - 1) + (col - 1)
-        #if board.tup[index] != 0:
-        #    print("Invalid move")
-        #    row_col = input("enter row,col: ")
-        #    row, col = map(int, row_col.split(","))
-        #    index = 3 * (row - 1) + (col - 1)
-        #board = board.make_move(index)
-        #print(board.to_pretty_string())
-        #if board.terminal:
-        #    break
-        # You can train as you go, or only at the beginning.
-        # Here, we train as we go, doing fifty rollouts each turn.
-        for i in range(50):
+        for i in range(150):
             tree.do_rollout(board)
         board = tree.choose(board)
         print(board.to_pretty_string())
         if board.terminal:
             break
-        for i in range(300):
+
+#        board = flip_board(board)
+
+        print(board.tup)
+        for i in range(50):
             tree2.do_rollout(board)
         board = tree2.choose(board)
-        print(board.to_pretty_string())
         
         if board.terminal:
+  #          board = flip_board(board)
+  #          board.is_max = False
+  #          board.winner = False
+  #          board.turn = True
             break
+
+ #       board = flip_board(board)
+        print(board.to_pretty_string())
     return board
 
 
@@ -319,8 +345,15 @@ if __name__ == "__main__":
 
     import time
 
+    mcts = MCTS(new_tic_tac_toe_board())
+    print(mcts.compute_max_probability([[(-1, 0.5), (3, 0.7), (10, 1.0)],
+                                  [(0, 0.2), (2, 0.4), (8, 1.0)],
+                                  [(-2, 0.3), (6, 0.6), (9, 1.0)]]))
 
-
+    f = open("weak_heuristic", "rb")
+    weak_heuristic_dict = pickle.load(f)
+    f.close()
+    #exit(0)
     #start = time.time()
     #simulate_until_no_tomorrow(load = True)
     #print("Finished")
@@ -331,8 +364,7 @@ if __name__ == "__main__":
     sum = 100
     for i in range(0,25):
         fail=0
-        board=play_game(mode="bvoi-greedy", mode2= "uct")
-        
+        board=play_game(mode="uct", mode2= "bvoi-greedy")
         if board.reward() != 0.5:
             if not board.is_max:
                 print("Kawabanga")
@@ -341,19 +373,7 @@ if __name__ == "__main__":
             print(board.to_pretty_string())
             fail = 1
         sum=sum-fail
-    print("mikapika")
-    for i in range(0,25):
-        fail=0
-        board=play_game(mode="uct", mode2= "bvoi-greedy")
-        if board.reward() != 0.5:
-          if board.is_max:
-            print("Kawabanga")
-          else:
-              print("Pikapika")
-          print(board.to_pretty_string())
-          fail = 1
-        sum=sum-fail
-    
+  
     print("We got ", sum)
     print("tie out of 5")
     end = time.time()
