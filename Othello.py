@@ -496,7 +496,7 @@ def play_game(args, mode="uct", mode2 = "uct", distribution_mode="weak heuristic
     return board
 
 
-def play_game_opposite(mode="uct", distribution_mode="weak heuristic"):
+def play_game_opposite(mode="uct", distribution_mode="sample"):
     board = new_othello_board()
     tree = MCTS(board, mode=mode, distribution_mode=distribution_mode)
     tree_uct = MCTS(board, mode="uct")
@@ -674,7 +674,7 @@ if __name__ == "__main__":
     
     }
     
-    for i in range(0,5):
+    for i in range(0,2):
         fail=0
         board=play_game(args, mode="bvoi-greedy", mode2 = "uct")
         win_sum += board.winner
@@ -695,7 +695,7 @@ if __name__ == "__main__":
     "rollouts1" : 250,
     "rollouts2" : 84
     }
-    for i in range(0,5):
+    for i in range(0,2):
         fail=0
         board=play_game(args, mode="uct", mode2 = "bvoi-greedy")
         win_sum += board.winner
