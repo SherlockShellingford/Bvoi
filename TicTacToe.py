@@ -251,7 +251,7 @@ def play_game(mode="uct", mode2 ="uct"):
 
     print(board.to_pretty_string())
     while True:
-        for i in range(50):
+        for i in range(150):
             tree.do_rollout(board)
         board = tree.choose(board)
         print(board.to_pretty_string())
@@ -261,7 +261,7 @@ def play_game(mode="uct", mode2 ="uct"):
 #        board = flip_board(board)
 
         print(board.tup)
-        for i in range(150):
+        for i in range(50):
             tree2.do_rollout(board)
         board = tree2.choose(board)
         
@@ -364,7 +364,7 @@ if __name__ == "__main__":
     sum = 100
     for i in range(0,25):
         fail=0
-        board=play_game(mode="bvoi-greedy", mode2= "uct")
+        board=play_game( mode= "FT Greedy", mode2="uct")
         if board.reward() != 0.5:
             if not board.is_max:
                 print("Kawabanga")
