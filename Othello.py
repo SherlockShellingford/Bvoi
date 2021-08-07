@@ -19,7 +19,7 @@ deductable_time = 0
 added_time = 0
 global weak_heuristic_dict
 
-def simulate(to_simulate, num_sims = 35):
+def simulate(to_simulate, num_sims = 15):
     global time_for_nn
     global deductable_time
     global added_time
@@ -230,7 +230,7 @@ class OthelloBoard(Node):
         states[flattup] = ret
         return ret
 
-    def make_move_bvoi(board, index, distribution_mode="weak heuristic"):
+    def make_move_bvoi(board, index, distribution_mode="sample"):
 
         tup = board.execute_move((int(index / 6), index % 6), 1 if board.is_max else -1)
         flattup = tuple(tup[0] + tup[1] + tup[2] + tup[3] + tup[4] + tup[5])
@@ -430,6 +430,7 @@ def do_turn_mcts(tree, board, is_absolute_rollouts = False, rollouts = 0):
     if is_absolute_rollouts:
         for i in range(rollouts):
             tree.do_rollout(board)
+            print(i)
         
     else:
         while True:
@@ -458,7 +459,7 @@ def flip_board(board):
     return OthelloBoard(not board.is_max, tup2, not board.turn, board.winner, board.terminal, 0, board.depth)
 
 
-def play_game(args, mode="uct", mode2 = "uct", distribution_mode="weak heuristic"):
+def play_game(args, mode="uct", mode2 = "uct", distribution_mode="sample"):
     board = new_othello_board()
     tree = MCTS(board, mode=mode, distribution_mode=distribution_mode)
     tree2 = MCTS(board, mode=mode2, distribution_mode=distribution_mode)
@@ -605,14 +606,16 @@ if __name__ == "__main__":
     #print("Finished")
     #print(time.time() - start)
     #exit(0)
-    f = open("weak_heuristic_othello_backup3", "rb")
-    weak_heuristic_dict = pickle.load(f)
+    print("xp")
+    #f = open("weak_heuristic_othello_backup3", "rb")
+    #print("choochoo")
+    #weak_heuristic_dict = pickle.load(f)
 
-    f.close()
+    #f.close()
     n = new_othello_board().tup
     n = [tuple(lst) for lst in n]
     n = tuple(n)
-    
+    print("toot")
     global time_for_nn
     alphazero_agent = NNetWrapper()
     alphazero_agent.load_checkpoint('./pretrained_models/othello', '6x6 checkpoint_145.pth.tar')
@@ -669,14 +672,14 @@ if __name__ == "__main__":
     win_sum = 0
     args = {
     "absolute_rollouts" : True,
-    "rollouts1" : 84,
-    "rollouts2" : 250
+    "rollouts1" : 50,
+    "rollouts2" : 150
     
     }
     
     for i in range(0,2):
         fail=0
-        board=play_game(args, mode="bvoi-greedy", mode2 = "uct")
+        board=play_game(args, mode="FT Greedy", mode2 = "uct")
         win_sum += board.winner
         for x in board.tup:
             if x == 0:
@@ -692,8 +695,8 @@ if __name__ == "__main__":
     
     args = {
     "absolute_rollouts" : True,
-    "rollouts1" : 250,
-    "rollouts2" : 84
+    "rollouts1" : 150,
+    "rollouts2" : 50
     }
     for i in range(0,2):
         fail=0

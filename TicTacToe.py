@@ -364,7 +364,7 @@ if __name__ == "__main__":
     sum = 100
     for i in range(0,25):
         fail=0
-        board=play_game(mode="uct", mode2= "bvoi-greedy")
+        board=play_game( mode= "FT Greedy", mode2="uct")
         if board.reward() != 0.5:
             if not board.is_max:
                 print("Kawabanga")

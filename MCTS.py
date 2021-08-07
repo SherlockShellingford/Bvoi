@@ -4,6 +4,7 @@ Luke Harold Miles, July 2019, Public Domain Dedication
 See also https://en.wikipedia.org/wiki/Monte_Carlo_tree_search
 https://gist.github.com/qpwo/c538c6f73727e254fdc7fab81024f6e1
 """
+import copy
 from abc import ABC, abstractmethod
 from collections import defaultdict
 import math
@@ -13,6 +14,9 @@ import time
 from scipy.integrate import quad
 from CVIBES.PrioritizedItem import PrioritizedItem
 from queue import PriorityQueue
+
+
+
 
 class MCTS:
     "Monte Carlo tree searcher. First rollout the tree then choose a move."
@@ -39,28 +43,30 @@ class MCTS:
         self.conspiracy_queue = []
         self.BSM_K = 3
         self.BSM_N = 1
+        self.node_to_path = dict()
         self.node_to_path_CVIBES = dict()
         self.node_to_dry_Us = dict()
         self.node_to_dry_Us[root] = [(root.meanvalue, 1.0)]
+        self.node_to_pick = []
 
 
-    def _mark_ancestors(self, node):
-        node.marked = node.marked + 1
-        if self.child_to_father.get(node) is None:
-            return
-        self._mark_ancestors(self.child_to_father[node])
+    #def _mark_ancestors(self, node):
+    #    node.marked = node.marked + 1
+    #    if self.child_to_father.get(node) is None:
+    #        return
+    #    self._mark_ancestors(self.child_to_father[node])
 
-    def _mark_all_S_ancestors(self, s):
-        for node in s:
-            self._mark_ancestors(node)
+   # def _mark_all_S_ancestors(self, s):
+   #     for node in s:
+   #         self._mark_ancestors(node)
 
 
     def _compute_Us_for_all_children(self, node, s):
-        self._mark_all_S_ancestors(s)
+    #    self._mark_all_S_ancestors(s)
         return self._compute_Us(node, s, return_children=True)
 
     def _compute_Us_for_node(self, node, s):
-        self._mark_all_S_ancestors(s)
+    #    self._mark_all_S_ancestors(s)
         return self._compute_Us(node, s, return_children=False)[0]
 
     # Example:
@@ -200,12 +206,15 @@ class MCTS:
             ret = self.compute_max_probability(child_dist, is_max = is_max)
         return ret, is_single_value
 
-    def gather_leaves(self, node):
+    def gather_leaves(self, node, path):
+        path.append(node)
         if self.children.get(node) is None:
+            if self.node_to_path.get(node) is None:
+                self.node_to_path[node] = path
             return [node]
         ret = []
         for c in self.children.get(node):
-            ret = ret + self.gather_leaves(c)
+            ret = ret + self.gather_leaves(c, copy.deepcopy(path))
         return ret
 
     def _compute_mean_of_distribution(self, dist):
@@ -314,7 +323,7 @@ class MCTS:
 
         for c in self.children[node]:
             for V in v_stash:
-                s = self.gather_leaves(c)
+                s = self.gather_leaves(c, [])
                 if c.__hash__() == alpha_node.__hash__():
                     self._store_probabilities(c, s, prob_dict,V,bigger_mode= not is_max)
                 else:
@@ -386,8 +395,7 @@ class MCTS:
             self.conspiracy_queue = self.conspiracy_queue + S
         if not self.conspiracy_queue:
           return [node, alpha_node]
-        return self.node_to_path_CVIBES[self.conspiracy_queue.pop()]
-
+        return self.node_to_path_CVIBES[self.node_to_pick.pop()]
 
 
 
@@ -399,37 +407,61 @@ class MCTS:
 
 
     def _batch_gather_greedy(self, node):
-        foundone=True
+
+
+
         s=[]
         alpha_node = self.alpha[node]
         beta1_node = self.beta1[node]
         alpha_Us = self._compute_Us(alpha_node, [])[0]
+        leaves = self.gather_leaves(node, [])
 
-        leaves = self.gather_leaves(node)
+        K_queue = []
+
+        if self.mode == "FT Greedy":
+            for _ in range(self.BSM_K):
+                K_queue.append((None,-1))
+
         for l in leaves:
             child_to_Us = self._compute_Us_for_all_children(node, [l] )
             for c in self.children[node]:
-                if l not in s:
+                if len(child_to_Us[c]) > 1 and l not in s:
                     if c.__hash__() != alpha_node.__hash__():
-                        c_bvoi = self._compute_bvoi_of_child(child_to_Us[c], alpha_Us, node.is_max)
+                        c_bvoi = self._compute_bvoi_of_child(child_to_Us[c], alpha_Us, is_alpha = False, is_max = node.is_max)
                     else:
-                        c_bvoi = self._compute_bvoi_of_child(child_to_Us[beta1_node], child_to_Us[c] ,
+                        c_bvoi = self._compute_bvoi_of_child(child_to_Us[c] , child_to_Us[beta1_node],
                                                              is_alpha=True, is_max=node.is_max)
                     if c_bvoi>0:
                         s.append(l)
-        return s
+                        if self.mode == "FT Greedy":
+                            put_in_queue_l_vpi((l,c_bvoi), K_queue)
+        return s, K_queue
 
 
 
     def _BVOI_select(self, node):
+        if self.mode == "FT Greedy" and len(self.node_to_pick) > 0:
+            return self.node_to_path[self.node_to_pick.pop()]
+
         if len(self.children[node]) == 1:
             for i in self.children[node]:
                 if i is None:
                     print("Oish noo2")
                     print(node.tup)
+                if self.mode == "FT Greedy":
+                    return [node, i]
                 return i
 
-        s=self._batch_gather_greedy(node)
+        s, best_VPI_k_nodes_for_FT =self._batch_gather_greedy(node)
+        if self.mode == "FT Greedy":
+            if len(s) == 0:
+                return [node, self.alpha[node]]
+            for _ in range(self.BSM_N):
+                for l_vpi_pair in best_VPI_k_nodes_for_FT:
+                    if l_vpi_pair[0] is not None:
+                        self.node_to_pick.append((l_vpi_pair[0]))
+            return self.node_to_path[self.node_to_pick.pop()]
+
         if len(s) == 0: #TODO ADD THIS!!!!!
             if self.alpha[node] is None:
                 print("Oish noo3")
@@ -447,9 +479,9 @@ class MCTS:
         for c in self.children[node]:
             child_Us=child_to_Us[c]
             if c.__hash__() != alpha_node.__hash__():
-                c_bvoi=self._compute_bvoi_of_child(child_Us,alpha_Us, is_max=node.is_max)
+                c_bvoi=self._compute_bvoi_of_child(child_Us,alpha_Us, is_alpha=False, is_max=node.is_max)
             else:
-                c_bvoi=self._compute_bvoi_of_child(beta1_Us,child_Us, is_alpha=True, is_max=node.is_max)
+                c_bvoi=self._compute_bvoi_of_child(child_Us, beta1_Us, is_alpha=True, is_max=node.is_max)
             if max<=c_bvoi:
                 max=c_bvoi
                 max_child=c
@@ -476,15 +508,11 @@ class MCTS:
             return self.Q[n] / self.N[n]  # average reward
 
         for c in self.children[node]:
-            break
             print(c.tup)
             print(self.Q[c])
             print(self.N[c])
             print(c.meanvalue)
             print(self._compute_Us(c,[]))
-            for c2 in self.children[c]:
-                print(c2.tup)
-                print(self._compute_Us(c2,[]))
             #if x[0]>2:
             #    print("Chikachika")
             #    while True:
@@ -501,6 +529,8 @@ class MCTS:
 
         path = self._select(node)
         leaf = path[-1]
+        if leaf is None:
+            print(path)
         self._expand(leaf)
         if self.mode == "c-vibes":
             for _ in range(self.BSM_N):
@@ -541,12 +571,24 @@ class MCTS:
             elif self.mode == "bvoi-greedy":
                 if first:
                     if self.bvoi_counter % self.bvoi_freq == 0:
-                        self.bvoi_counter=0
+                        self.bvoi_counter=1
                         node = self._BVOI_select(node)
-                        self.last_chosen_by_bvoi=node
                     else:
                         self.bvoi_counter+=1
-                        node = self.last_chosen_by_bvoi
+                        node = self._uct_select(node)
+                    first=False
+                else:
+                    node = self._uct_select(node)
+            elif self.mode == "FT Greedy":
+                if first:
+                    if self.bvoi_counter % self.bvoi_freq == 0:
+                        self.bvoi_counter=1
+                        path = self._BVOI_select(node)
+                        node = path[-1]
+                        path = path[:-1]
+                    else:
+                        self.bvoi_counter+=1
+                        node = self._uct_select(node)
                     first=False
                 else:
                     node = self._uct_select(node)
@@ -587,7 +629,7 @@ class MCTS:
         "Update the `children` dict with the children of `node`"
         if node in self.children:
             return  # already expanded
-        if self.mode == "bvoi-greedy" or self.mode== "c-vibes":
+        if self.mode == "bvoi-greedy" or self.mode== "c-vibes" or self.mode == "FT Greedy":
             children = node.find_children_bvoi(distribution_mode=self.distribution_mode)
         else:
             children = node.find_children()
@@ -672,6 +714,21 @@ class MCTS:
             )
 
         return max(self.children[node], key=uct)
+
+
+def shift_right_with_value(queue, index, new_value):
+    for i in reversed(range(index + 1, len(queue))):
+        queue[i] = queue[i - 1]
+    queue[index] = new_value
+
+
+def put_in_queue_l_vpi(l_vpi_pair, queue):
+    for i in range(len(queue)):
+        if queue[i][1] < l_vpi_pair[1]:
+            shift_right_with_value(queue, i, l_vpi_pair)
+            return
+
+
 
 
 class Node():
