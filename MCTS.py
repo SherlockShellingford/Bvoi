@@ -36,7 +36,7 @@ class MCTS:
         if mode == "c-vibes":
             self.distribution_mode="weak heuristic"
         self.bvoi_counter=5
-        self.bvoi_freq=1
+        self.bvoi_freq=2
         self.last_chosen_by_bvoi=None
         self.node_to_tag=dict()
         self.first_time_add=True

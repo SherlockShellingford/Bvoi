@@ -19,7 +19,7 @@ deductable_time = 0
 added_time = 0
 global weak_heuristic_dict
 
-def simulate(to_simulate, num_sims = 15):
+def simulate(to_simulate, num_sims = 35):
     global time_for_nn
     global deductable_time
     global added_time
@@ -40,6 +40,29 @@ def simulate(to_simulate, num_sims = 15):
 
     return meanvalue
 
+
+def corner_heuristic(board, previous_move_size):
+    sum = 0
+    count_heuristic = 0
+    for x in range(board.n):
+        for y in range(board.n):
+            if board.tup66[x][y]!=0:
+                sum+=1
+            count_heuristic+=board.tup66[x][y]
+    count_heuristic = count_heuristic/sum
+    if board.is_max:
+        move_size = len(board.get_legal_moves(board, 1))
+        move_heuristic = (move_size - previous_move_size) / (move_size + previous_move_size)
+    else:
+        move_size = len(get_legal_moves(board, -1))
+        move_heuristic = (previous_move_size - move_size) / (move_size + previous_move_size)
+    corner_heuristic = board.tup[0][0] + board.tup[5][5] + board.tup[5][0] +board.tup[0][5]
+    corner_heuristic = corner_heuristic / 4
+    border_heuristic = 0
+    for i in range(1,4):
+        border_heuristic += board.tup[0][i] + board.tup[i][5] + board.tup[5][i] +board.tup[i][0]
+    border_heuristic = border_heuristic/16
+    
 class OthelloBoard(Node):
 
     __directions = [(1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1)]
@@ -191,8 +214,9 @@ class OthelloBoard(Node):
         if board.terminal:  # If the game is finished then no moves can be made
             return set()
         # Otherwise, you can make a move in each of the empty spots
+        ch = board.get_legal_moves(1 if board.is_max else -1)
         return {
-            board.make_move_bvoi(i, distribution_mode=distribution_mode) for i in board.get_legal_moves(1 if board.is_max else -1)
+            board.make_move_bvoi(i, distribution_mode=distribution_mode, move_size = len(c)) for i in board.get_legal_moves(1 if board.is_max else -1)
         }
 
 
@@ -230,7 +254,7 @@ class OthelloBoard(Node):
         states[flattup] = ret
         return ret
 
-    def make_move_bvoi(board, index, distribution_mode="sample"):
+    def make_move_bvoi(board, index, distribution_mode="sample", move_size = 0):
 
         tup = board.execute_move((int(index / 6), index % 6), 1 if board.is_max else -1)
         flattup = tuple(tup[0] + tup[1] + tup[2] + tup[3] + tup[4] + tup[5])
@@ -246,7 +270,23 @@ class OthelloBoard(Node):
             else:
                 ret.winner = None
             return ret
-
+        
+        elif distribution_mode == "corner heuristic":
+            ret = OthelloBoard(not board.is_max, tup, turn, None, None, 0, board.depth + 1)
+            ret.terminal = not ret.has_legal_moves(1 if ret.is_max else -1)
+            if ret.terminal:
+                ret.winner = _find_winner(ret)
+                if ret.winner == 0.5:
+                  ret.meanvalue = 0
+                if ret.winner == 1.0:
+                  ret.meanvalue = 1.0
+                if ret.winner == 0:
+                  ret.meanvalue = -1
+            else:
+                ret.winner = None
+                ret.meanvalue = corner_heuristic(tup, move_size)
+            
+        
         elif distribution_mode=="NN":
             if not board.is_max:
                 tup2=deepcopy(tup)
@@ -459,7 +499,7 @@ def flip_board(board):
     return OthelloBoard(not board.is_max, tup2, not board.turn, board.winner, board.terminal, 0, board.depth)
 
 
-def play_game(args, mode="uct", mode2 = "uct", distribution_mode="sample"):
+def play_game(args, mode="uct", mode2 = "uct", distribution_mode="weak heuristic"):
     board = new_othello_board()
     tree = MCTS(board, mode=mode, distribution_mode=distribution_mode)
     tree2 = MCTS(board, mode=mode2, distribution_mode=distribution_mode)
@@ -496,60 +536,6 @@ def play_game(args, mode="uct", mode2 = "uct", distribution_mode="sample"):
     print(board.to_pretty_string())
     return board
 
-
-def play_game_opposite(mode="uct", distribution_mode="sample"):
-    board = new_othello_board()
-    tree = MCTS(board, mode=mode, distribution_mode=distribution_mode)
-    tree_uct = MCTS(board, mode="uct")
-    game = OthelloGame(6)
-    #rival = MCTSaz(game, alphazero_agent)
-    print(board.to_pretty_string())
-
-    while True:
-
-        board = do_turn_mcts(tree_uct, board)
-
-        print(board.to_pretty_string())
-
-        if board.terminal:
-            break
-
-        tup2=[]
-        for i in range(6):
-            row = []
-            for j in range(6):
-                row.append(-board.tup[i][j])
-            tup2.append(row)
-
-        board = OthelloBoard(not board.is_max, tup2, not board.turn, board.winner, board.terminal, 0, board.depth)
-
-
-        board = do_turn_mcts(tree, board)
-
-
-        if board.terminal:
-            tup2 = []
-            for i in range(6):
-                row = []
-                for j in range(6):
-                    row.append(-board.tup[i][j])
-                tup2.append(row)
-            board = OthelloBoard(not board.is_max, tup2, not board.turn, 1 - board.winner, board.terminal, 0, board.depth)
-            break
-
-        tup2 = []
-        for i in range(6):
-            row = []
-            for j in range(6):
-                row.append(-board.tup[i][j])
-            tup2.append(row)
-        board = OthelloBoard(not board.is_max, tup2, not board.turn, board.winner, board.terminal, 0, board.depth)
-        print(board.to_pretty_string())
-
-
-
-    print(board.to_pretty_string())
-    return board
 
 
 def simulate2(node, dict, start = 0):
@@ -607,11 +593,11 @@ if __name__ == "__main__":
     #print(time.time() - start)
     #exit(0)
     print("xp")
-    #f = open("weak_heuristic_othello_backup3", "rb")
-    #print("choochoo")
-    #weak_heuristic_dict = pickle.load(f)
+    f = open("weak_heuristic_othello_backup3", "rb")
+    print("choochoo")
+    weak_heuristic_dict = pickle.load(f)
 
-    #f.close()
+    f.close()
     n = new_othello_board().tup
     n = [tuple(lst) for lst in n]
     n = tuple(n)
@@ -672,14 +658,14 @@ if __name__ == "__main__":
     win_sum = 0
     args = {
     "absolute_rollouts" : True,
-    "rollouts1" : 50,
+    "rollouts1" : 150,
     "rollouts2" : 150
     
     }
     
     for i in range(0,2):
         fail=0
-        board=play_game(args, mode="FT Greedy", mode2 = "uct")
+        board=play_game(args, mode="uct", mode2 = "uct")
         win_sum += board.winner
         for x in board.tup:
             if x == 0:
@@ -696,11 +682,11 @@ if __name__ == "__main__":
     args = {
     "absolute_rollouts" : True,
     "rollouts1" : 150,
-    "rollouts2" : 50
+    "rollouts2" : 150
     }
     for i in range(0,2):
         fail=0
-        board=play_game(args, mode="uct", mode2 = "bvoi-greedy")
+        board=play_game(args, mode="uct", mode2 = "uct")
         win_sum += board.winner
         for x in board.tup:
             if x == 0:
