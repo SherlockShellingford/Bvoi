@@ -17,6 +17,7 @@ from queue import PriorityQueue
 
 def corner_heuristic(board, previous_move_size):
     sum = 0
+
     count_heuristic = 0
     for x in range(6):
         for y in range(6):
