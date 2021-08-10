@@ -36,6 +36,7 @@ def corner_heuristic(board, previous_move_size):
     return count_heuristic*0.1 + move_heuristic*0.15+corner_heuristic*0.65+border_heuristic*0.1
 
 
+
 class MCTS:
     "Monte Carlo tree searcher. First rollout the tree then choose a move."
 
