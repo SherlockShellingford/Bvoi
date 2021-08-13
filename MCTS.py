@@ -1,7 +1,7 @@
 """
 A minimal implementation of Monte Carlo tree search (MCTS) in Python 3
 Luke Harold Miles, July 2019, Public Domain Dedication
-See also https://en.wikipedia.org/wiki/Monte_Carlo_tree_search
+See also https://en.wi0kipedia.org/wiki/Monte_Carlo_tree_search
 https://gist.github.com/qpwo/c538c6f73727e254fdc7fab81024f6e1
 """
 import copy
@@ -15,6 +15,29 @@ from scipy.integrate import quad
 from CVIBES.PrioritizedItem import PrioritizedItem
 from queue import PriorityQueue
 
+def corner_heuristic(board, previous_move_size):
+    sum = 0
+
+    count_heuristic = 0
+    for x in range(6):
+        for y in range(6):
+            if board.tup66[x][y]!=0:
+                sum+=1
+            count_heuristic+=board.tup66[x][y]
+    count_heuristic = count_heuristic/sum
+    if not board.is_max:
+        move_size = len(board.get_legal_moves( -1))
+        move_heuristic = (previous_move_size - move_size) / (move_size + previous_move_size)
+    else:
+        move_size = len(board.get_legal_moves( 1))
+        move_heuristic = (move_size - previous_move_size) / (move_size + previous_move_size)
+    corner_heuristic = board.tup[0][0] + board.tup[5][5] + board.tup[5][0] +board.tup[0][5]
+    corner_heuristic = corner_heuristic / 4
+    border_heuristic = 0
+    for i in range(1,4):
+        border_heuristic += board.tup[0][i] + board.tup[i][5] + board.tup[5][i] +board.tup[i][0]
+    border_heuristic = border_heuristic/16
+    return count_heuristic*0.1 + move_heuristic*0.15+corner_heuristic*0.65+border_heuristic*0.1
 
 
 
@@ -557,7 +580,7 @@ class MCTS:
                 n = unexplored.pop()
                 path.append(n)
                 return path
-            if self.mode == "uct":
+            if self.mode == "uct" or self.mode == "corner uct":
                 node = self._uct_select(node)
             elif self.mode == "c-vibes":
                 if first:
@@ -683,7 +706,7 @@ class MCTS:
                 reward = node.reward()
                 reward = node.reward()
                 return 1 - reward if invert_reward else reward
-            if self.mode!="uct":
+            if self.mode!="uct" and self.mode != "corner uct":
                 node = node.find_random_child_bvoi(distribution_mode="none")
             else:
                 node = node.find_random_child()
@@ -699,6 +722,9 @@ class MCTS:
             self.Q[node] += reward
             reward = 1 - reward  # 1 for me is 0 for my enemy, and vice versa
 
+
+
+
     def _uct_select(self, node):
         "Select a child of node, balancing exploration & exploitation"
 
@@ -706,10 +732,16 @@ class MCTS:
         assert all(n in self.children for n in self.children[node])
 
         log_N_vertex = math.log(self.N[node])
-
         def uct(n):
             "Upper confidence bound for trees"
-            return self.Q[n] / self.N[n] + self.exploration_weight * math.sqrt(
+            initial_heuristic = 1
+            if not node.is_max:
+                print("a")
+            if self.mode != "uct":
+                if not node.is_max:
+                    pass
+                initial_heuristic = (1 if node.is_max else -1) * corner_heuristic(n, len(self.children[node]))
+            return self.Q[n] / self.N[n] + initial_heuristic * self.exploration_weight * math.sqrt(
                 log_N_vertex / self.N[n]
             )
 
