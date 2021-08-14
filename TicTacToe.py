@@ -25,7 +25,7 @@ from scipy.stats import norm
 #from MCTSaz import MCTSaz
 from game.TicTacToeGame import TicTacToeGame
 import pickle
-
+from NormalSearchAlgorithm import NormalSearchAlgorithm
 _TTTB = namedtuple("TicTacToeBoard", "tup turn winner terminal")
 
 states=dict()
@@ -243,7 +243,7 @@ def flip_board(board):
 
 def play_game(mode="uct", mode2 ="uct"):
     board = new_tic_tac_toe_board()
-    tree = MCTS(board, mode=mode)
+    tree = NormalSearchAlgorithm(board, mode=mode, distribution_mode="weak heuristic")
     tree2 = MCTS(flip_board(board), mode=mode2)
     game=TicTacToeGame()
     #rival=MCTSaz(game,alphazero_agent)
@@ -261,7 +261,7 @@ def play_game(mode="uct", mode2 ="uct"):
 #        board = flip_board(board)
 
         print(board.tup)
-        for i in range(50):
+        for i in range(400):
             tree2.do_rollout(board)
         board = tree2.choose(board)
         
