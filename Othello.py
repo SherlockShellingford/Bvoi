@@ -524,6 +524,8 @@ def play_game(args, mode="uct", mode2 = "uct", distribution_mode="corner heurist
 
         board = flip_board(board)
 
+        board = flip_board(board)
+
 
 
         board = do_turn_mcts(tree2, board, is_absolute_rollouts = args["absolute_rollouts"], rollouts = args["rollouts2"])
@@ -673,6 +675,7 @@ if __name__ == "__main__":
     sum = 10
     win_sum = 0
     args = {
+<<<<<<< HEAD
     "absolute_rollouts" : False,
     "rollouts1" : 50,
     "rollouts2" : 150
