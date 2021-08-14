@@ -495,8 +495,8 @@ def play_game(args, mode="uct", mode2="uct", distribution_mode="corner heuristic
 
     while True:
 
-        board = board.find_random_child(board) # TODO delete
-        #board = do_turn_mcts(tree, board, is_absolute_rollouts = args["absolute_rollouts"], rollouts = args["rollouts1"]) TODO uncomment
+        #board = board.find_random_child() # TODO delete
+        board = do_turn_mcts(tree, board, is_absolute_rollouts = args["absolute_rollouts"], rollouts = args["rollouts1"]) #TODO uncomment
         
         
         print(board.to_pretty_string())

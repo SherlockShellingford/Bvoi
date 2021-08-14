@@ -30,7 +30,6 @@ class NormalSearchAlgorithm(SearchAlgorithm):
                 node = self._BVOI_select(node)
 
             elif self.mode == "FT Greedy":
-                print("zura")
                 node = self._BVOI_select(node)[-1]
 
     def _expand(self, node):
@@ -69,7 +68,7 @@ class NormalSearchAlgorithm(SearchAlgorithm):
         self.beta1[node]=second_to_max_c
 
     def minmax_on_expanded_nodes(self, node):
-        if self.children.get(node) is None:
+        if self.children.get(node) is None or node.terminal:
             return node.meanvalue
         else:
             return max([self.minmax_on_expanded_nodes(c) for c in self.children[node]])
