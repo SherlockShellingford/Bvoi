@@ -1,7 +1,7 @@
 """
 A minimal implementation of Monte Carlo tree search (MCTS) in Python 3
 Luke Harold Miles, July 2019, Public Domain Dedication
-See also https://en.wikipedia.org/wiki/Monte_Carlo_tree_search
+See also https://en.wi0kipedia.org/wiki/Monte_Carlo_tree_search
 https://gist.github.com/qpwo/c538c6f73727e254fdc7fab81024f6e1
 """
 import copy
@@ -15,6 +15,29 @@ from scipy.integrate import quad
 from CVIBES.PrioritizedItem import PrioritizedItem
 from queue import PriorityQueue
 
+def corner_heuristic(board, previous_move_size):
+    sum = 0
+
+    count_heuristic = 0
+    for x in range(6):
+        for y in range(6):
+            if board.tup66[x][y]!=0:
+                sum+=1
+            count_heuristic+=board.tup66[x][y]
+    count_heuristic = count_heuristic/sum
+    if not board.is_max:
+        move_size = len(board.get_legal_moves( -1))
+        move_heuristic = (previous_move_size - move_size) / (move_size + previous_move_size)
+    else:
+        move_size = len(board.get_legal_moves( 1))
+        move_heuristic = (move_size - previous_move_size) / (move_size + previous_move_size)
+    corner_heuristic = board.tup[0][0] + board.tup[5][5] + board.tup[5][0] +board.tup[0][5]
+    corner_heuristic = corner_heuristic / 4
+    border_heuristic = 0
+    for i in range(1,4):
+        border_heuristic += board.tup[0][i] + board.tup[i][5] + board.tup[5][i] +board.tup[i][0]
+    border_heuristic = border_heuristic/16
+    return count_heuristic*0.1 + move_heuristic*0.15+corner_heuristic*0.65+border_heuristic*0.1
 
 
 
@@ -36,7 +59,7 @@ class MCTS:
         if mode == "c-vibes":
             self.distribution_mode="weak heuristic"
         self.bvoi_counter=5
-        self.bvoi_freq=2
+        self.bvoi_freq=1
         self.last_chosen_by_bvoi=None
         self.node_to_tag=dict()
         self.first_time_add=True
@@ -48,7 +71,8 @@ class MCTS:
         self.node_to_dry_Us = dict()
         self.node_to_dry_Us[root] = [(root.meanvalue, 1.0)]
         self.node_to_pick = []
-
+        self.debug_counter = 0.0
+        self.debug_counter2 = 0.0
 
     #def _mark_ancestors(self, node):
     #    node.marked = node.marked + 1
@@ -545,19 +569,37 @@ class MCTS:
         start = time.time()
         path = []
         first=True
-
+        #DEBUG
+        which = 0
+        #DEBUG
         while True:
             path.append(node)
             if node not in self.children or not self.children[node]:
                 # node is either unexplored or terminal
-
+                #DEBUG
+                t = time.time() - start
+                if which == 1:
+                    self.debug_counter += t
+                if which == 2:
+                    self.debug_counter2 += t
+                #print(t)
+                #DEBUG
+                
                 return path
             unexplored = self.children[node] - self.children.keys()
             if unexplored:
                 n = unexplored.pop()
                 path.append(n)
+                #DEBUG
+                t = time.time() - start
+                if which == 1:
+                    self.debug_counter += t
+                if which == 2:
+                    self.debug_counter2 += t
+                #print(t)
+                #DEBUG
                 return path
-            if self.mode == "uct":
+            if self.mode == "uct" or self.mode == "corner uct":
                 node = self._uct_select(node)
             elif self.mode == "c-vibes":
                 if first:
@@ -582,11 +624,19 @@ class MCTS:
             elif self.mode == "FT Greedy":
                 if first:
                     if self.bvoi_counter % self.bvoi_freq == 0:
+                        #DEBUG
+                        #print("voi")
+                        which = 1
+                        #DEBUG
                         self.bvoi_counter=1
                         path = self._BVOI_select(node)
                         node = path[-1]
                         path = path[:-1]
                     else:
+                        #DEBUG
+                        #print("uct")
+                        which = 2
+                        #DEBUG
                         self.bvoi_counter+=1
                         node = self._uct_select(node)
                     first=False
@@ -631,11 +681,13 @@ class MCTS:
             return  # already expanded
         if self.mode == "bvoi-greedy" or self.mode== "c-vibes" or self.mode == "FT Greedy":
             children = node.find_children_bvoi(distribution_mode=self.distribution_mode)
+            self.children[node]=children
+            
         else:
-            children = node.find_children()
-
-
-        self.children[node]=children
+            children = node.find_children()  
+            self.children[node]=children
+            return
+          
         is_max=node.is_max
         if is_max:
             max=np.NINF
@@ -670,7 +722,6 @@ class MCTS:
                     second_to_max_c=n
         self.alpha[node]=max_c
         self.beta1[node]=second_to_max_c
-        self.update_dry_Us(node, is_a_leaf = True)
 
 
     def simulate(self, node, invert_reward=True):
@@ -683,7 +734,7 @@ class MCTS:
                 reward = node.reward()
                 reward = node.reward()
                 return 1 - reward if invert_reward else reward
-            if self.mode!="uct":
+            if self.mode!="uct" and self.mode != "corner uct":
                 node = node.find_random_child_bvoi(distribution_mode="none")
             else:
                 node = node.find_random_child()
@@ -699,6 +750,9 @@ class MCTS:
             self.Q[node] += reward
             reward = 1 - reward  # 1 for me is 0 for my enemy, and vice versa
 
+
+
+
     def _uct_select(self, node):
         "Select a child of node, balancing exploration & exploitation"
 
@@ -706,10 +760,12 @@ class MCTS:
         assert all(n in self.children for n in self.children[node])
 
         log_N_vertex = math.log(self.N[node])
-
         def uct(n):
             "Upper confidence bound for trees"
-            return self.Q[n] / self.N[n] + self.exploration_weight * math.sqrt(
+            initial_heuristic = 1
+            if self.mode != "uct":
+                initial_heuristic = (1 if node.is_max else -1) * corner_heuristic(n, len(self.children[node]))
+            return self.Q[n] / self.N[n] + initial_heuristic * self.exploration_weight * math.sqrt(
                 log_N_vertex / self.N[n]
             )
 
