@@ -25,11 +25,12 @@ class NormalSearchAlgorithm(SearchAlgorithm):
             unexplored = self.children[node] - self.children.keys()
             if unexplored:
                 n = unexplored.pop()
-                return node
+                return n
             elif self.mode == "bvoi-greedy":
                 node = self._BVOI_select(node)
 
             elif self.mode == "FT Greedy":
+                print("zura")
                 node = self._BVOI_select(node)[-1]
 
     def _expand(self, node):

@@ -49,6 +49,7 @@ class SearchAlgorithm():
         self.node_to_path_CVIBES = dict()
         self.node_to_dry_Us = dict()
         self.node_to_dry_Us[root] = [(root.meanvalue, 1.0)]
+        self.node_to_pick = []
 
     def _compute_Us_for_all_children(self, node, s):
         #    self._mark_all_S_ancestors(s)
