@@ -183,6 +183,19 @@ class MCTS(SearchAlgorithm):
                     first=False
                 else:
                     node = self._uct_select(node)
+            elif self.mode == "MGSS*":
+                if first:
+                    if self.bvoi_counter % self.bvoi_freq == 0:
+                        self.bvoi_counter=1
+                        path = self._BVOI_select(node)
+                        node = path[-1]
+                        path = path[:-1]
+                    else:
+                        self.bvoi_counter+=1
+                        node = self._uct_select(node)
+                    first=False
+                else:
+                    node = self._uct_select(node)
 
     def update_dry_Us(self, node, is_a_leaf = False, last_changed_value = 1000):
 
@@ -220,7 +233,7 @@ class MCTS(SearchAlgorithm):
         "Update the `children` dict with the children of `node`"
         if node in self.children:
             return  # already expanded
-        if self.mode == "bvoi-greedy" or self.mode== "c-vibes" or self.mode == "FT Greedy":
+        if self.mode == "bvoi-greedy" or self.mode== "c-vibes" or self.mode == "FT Greedy" or "MGSS*":
             children = node.find_children_bvoi(distribution_mode=self.distribution_mode)
             self.children[node]=children
             

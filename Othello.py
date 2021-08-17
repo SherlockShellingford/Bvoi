@@ -68,6 +68,33 @@ def corner_heuristic(board, previous_move_size):
     return count_heuristic * 0.1 + move_heuristic * 0.15 + corner_heuristic * 0.65 + border_heuristic * 0.1
 
 
+def bad_heuristic(board, previous_move_size):
+    sum = 0
+    count_heuristic = 0
+    for x in range(6):
+        for y in range(6):
+            if board.tup66[x][y] != 0:
+                sum += 1
+            count_heuristic += board.tup66[x][y]
+    count_heuristic = count_heuristic / sum
+    if board.is_max:
+        move_size = len(board.get_legal_moves(1))
+        move_heuristic = (move_size - previous_move_size) / (move_size + previous_move_size)
+    else:
+        move_size = len(board.get_legal_moves(-1))
+        move_heuristic = (previous_move_size - move_size) / (move_size + previous_move_size)
+    corner_heuristic = board.tup[0][0] + board.tup[5][5] + board.tup[5][0] + board.tup[0][5]
+    corner_heuristic = corner_heuristic / 4
+    border_heuristic = 0
+    for i in range(1, 4):
+        border_heuristic += board.tup[0][i] + board.tup[i][5] + board.tup[5][i] + board.tup[i][0]
+    border_heuristic = border_heuristic / 16
+    return count_heuristic * 0.6 + move_heuristic * 0.4
+
+
+
+
+
 class OthelloBoard(Node):
     __directions = [(1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1)]
 
@@ -276,6 +303,22 @@ class OthelloBoard(Node):
             else:
                 ret.winner = None
                 ret.meanvalue = corner_heuristic(ret, move_size)
+
+
+        elif distribution_mode == "bad heuristic":
+            ret = OthelloBoard(not board.is_max, tup, turn, None, None, 0, board.depth + 1)
+            ret.terminal = not ret.has_legal_moves(1 if ret.is_max else -1)
+            if ret.terminal:
+                ret.winner = _find_winner(ret)
+                if ret.winner == 0.5:
+                    ret.meanvalue = 0
+                if ret.winner == 1.0:
+                    ret.meanvalue = 1.0
+                if ret.winner == 0:
+                    ret.meanvalue = -1
+            else:
+                ret.winner = None
+                ret.meanvalue = bad_heuristic(ret, move_size)
 
 
         elif distribution_mode == "NN":
@@ -487,7 +530,7 @@ def flip_board(board):
 
 def play_game(args, mode="uct", mode2="uct", distribution_mode="corner heuristic"):
     board = new_othello_board()
-    tree = NormalSearchAlgorithm(board, mode=mode, distribution_mode=distribution_mode)
+    tree = MCTS(board, mode=mode, distribution_mode=distribution_mode)
     tree2 = MCTS(board, mode=mode2, distribution_mode=distribution_mode)
     game = OthelloGame(6)
     # rival=MCTSaz(game,alphazero_agent)
@@ -655,9 +698,9 @@ if __name__ == "__main__":
     
     }
 
-    for i in range(0, 20):
+    for i in range(0, 100):
         fail = 0
-        board = play_game(args, mode="FT Greedy", mode2="corner uct")
+        board = play_game(args, mode="FT Greedy", mode2="uct")
         win_sum += board.winner
         for x in board.tup:
             if x == 0:
@@ -669,23 +712,6 @@ if __name__ == "__main__":
     end = time.time()
     print("Time:", start - end)
 
-    args = {
-        "absolute_rollouts": True,
-        "rollouts1": 150,
-        "rollouts2": 150
-    }
-    for i in range(0, 2):
-        fail = 0
-        board = play_game(args, mode="uct", mode2="uct")
-        win_sum += board.winner
-        for x in board.tup:
-            if x == 0:
-                fail = 1
-        sum = sum - fail
-
-    print("Win_sum:", win_sum)
-    end = time.time()
-    print("Time:", start - end)
 
 
 

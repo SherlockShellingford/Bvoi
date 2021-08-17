@@ -392,6 +392,8 @@ class SearchAlgorithm():
         if self.mode == "FT Greedy":
             for _ in range(self.BSM_K):
                 K_queue.append((None, -1))
+        if self.mode == "MGSS*":
+            maxx = 0
 
         for l in leaves:
             child_to_Us = self._compute_Us_for_all_children(node, [l])
@@ -407,6 +409,12 @@ class SearchAlgorithm():
                         s.append(l)
                         if self.mode == "FT Greedy":
                             put_in_queue_l_vpi((l, c_bvoi), K_queue)
+                        if self.mode == "MGSS*":
+                            if c_bvoi > maxx:
+                                maxx = c_bvoi
+                                s = [l]
+                        
+        
         return s, K_queue
 
     def _BVOI_select(self, node):
@@ -418,11 +426,16 @@ class SearchAlgorithm():
                 if i is None:
                     print("Oish noo2")
                     print(node.tup)
-                if self.mode == "FT Greedy":
+                if self.mode == "FT Greedy" or self.mode == "MGSS*":
                     return [node, i]
                 return i
 
         s, best_VPI_k_nodes_for_FT = self._batch_gather_greedy(node)
+        if self.mode == "MGSS*":
+            if len(s) == 0:
+                return [node, self.alpha[node]]
+            else:
+                return self.node_to_path[s[0]]
         if self.mode == "FT Greedy":
             if len(s) == 0:
                 return [node, self.alpha[node]]
