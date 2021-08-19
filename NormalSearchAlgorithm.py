@@ -18,6 +18,7 @@ class NormalSearchAlgorithm(SearchAlgorithm):
 
     def _select(self, node):
         while True:
+            print("2")
             if node not in self.children or not self.children[node]:
                 # node is either unexplored or terminal
 
@@ -68,6 +69,7 @@ class NormalSearchAlgorithm(SearchAlgorithm):
         self.beta1[node]=second_to_max_c
 
     def minmax_on_expanded_nodes(self, node):
+        print("1")
         if self.children.get(node) is None or node.terminal:
             return node.meanvalue
         else:
@@ -75,6 +77,7 @@ class NormalSearchAlgorithm(SearchAlgorithm):
 
 
     def get_best_child(self, node):
+
         children_list = []
         for c in self.children[node]:
             children_list.append((c, self.minmax_on_expanded_nodes(c)))

@@ -205,14 +205,24 @@ class SearchAlgorithm():
         previous_distance_i = 0
         previous_distance_j = 0
         ret = []
+        cdf = 0
         while i < len(dist1) and j < len(dist2):
-            ret.append((is_max_coefficent * (dist1[i][0] - dist2[j][0]), min(dist1[i][1] - previous_distance_i ,dist2[j][1] - previous_distance_j))
-            if dist1[i][1] - previous_distance_i < dist2[j][1] - previous_distance_j:
+            dist = min(dist1[i][1] - previous_distance_j ,dist2[j][1] - previous_distance_i)
+            if dist:
+                ret.append((is_max_coefficent * (dist1[i][0] - dist2[j][0]), cdf + dist))
+            cdf = ret[-1][1]
+            if i == len(dist1) - 1:
+                previous_distance_j = dist2[j][1]
+                j = j + 1
+
+
+            elif j == len(dist2) - 1 or (dist1[i][1]) < (dist2[j][1]):
                 previous_distance_i = dist1[i][1]
                 i = i + 1
             else:
                 previous_distance_j = dist2[j][1]
                 j = j + 1
+        return ret
         
                 
             
@@ -230,10 +240,10 @@ class SearchAlgorithm():
             is_max_coefficent = -1
 
         if not is_alpha:
-            return _compute_mean_of_distribution_max_0(_compute_difference_of_distributions(Unode, Ucompare_against, is_max_coefficent ))
+            return self._compute_mean_of_distribution_max_0(self._compute_difference_of_distributions(Unode, Ucompare_against, is_max_coefficent ))
 
         else:
-            return _compute_mean_of_distribution_max_0(_compute_difference_of_distributions(Ucompare_against, Unode, is_max_coefficent ))
+            return self._compute_mean_of_distribution_max_0(self._compute_difference_of_distributions(Ucompare_against, Unode, is_max_coefficent ))
 
     def chance_for_dist_biggersmaller_than_val(self, dist, val, bigger_mode=True):
         sum = 0
@@ -400,7 +410,7 @@ class SearchAlgorithm():
         beta1_node = self.beta1[node]
         alpha_Us = self._compute_Us(alpha_node, self.gather_leaves(alpha_node,[]))[0]
         leaves = self.gather_leaves(node, [])
-        alpha_nodes = 
+
         K_queue = []
 
         if self.mode == "FT Greedy":
@@ -428,12 +438,13 @@ class SearchAlgorithm():
                                 maxx = c_bvoi
                                 s = [l]
                         
+        print(self.mode)
+        print(len(leaves))
+        print(len(s))
+        if len(s) == 0 and self.mode != "MGSS*":
+            print("zaza")
         
-        
-        if self.mode == "FT Greedy":
-            print("FT")
-            if len(s) == 0:
-                print("zaza")
+
         
         return s, K_queue
 
@@ -458,7 +469,7 @@ class SearchAlgorithm():
                 return self.node_to_path[s[0]]
         if self.mode == "FT Greedy":
             if len(s) == 0:
-                return [node, self.alpha[node]]
+                return [node]
             for _ in range(self.BSM_N):
                 for l_vpi_pair in best_VPI_k_nodes_for_FT:
                     if l_vpi_pair[0] is not None:
@@ -505,3 +516,6 @@ def put_in_queue_l_vpi(l_vpi_pair, queue):
         if queue[i][1] < l_vpi_pair[1]:
             shift_right_with_value(queue, i, l_vpi_pair)
             return
+
+
+
