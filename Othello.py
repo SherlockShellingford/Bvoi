@@ -528,7 +528,7 @@ def flip_board(board):
     return OthelloBoard(not board.is_max, tup2, not board.turn, board.winner, board.terminal, 0, board.depth)
 
 
-def play_game(args, mode="uct", mode2="uct", distribution_mode="corner heuristic"):
+def play_game(args, mode="uct", mode2="uct", distribution_mode="bad heuristic"):
     board = new_othello_board()
     tree = MCTS(board, mode=mode, distribution_mode=distribution_mode)
     tree2 = MCTS(board, mode=mode2, distribution_mode=distribution_mode)
@@ -698,7 +698,7 @@ if __name__ == "__main__":
     
     }
 
-    for i in range(0, 100):
+    for i in range(0, 3):
         fail = 0
         board = play_game(args, mode="FT Greedy", mode2="uct")
         win_sum += board.winner

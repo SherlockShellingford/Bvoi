@@ -199,10 +199,28 @@ class SearchAlgorithm():
             ret = ret + self.gather_leaves(c, copy.deepcopy(path))
         return ret
 
-    def _compute_mean_of_distribution(self, dist):
+    def _compute_difference_of_distributions(self, dist1, dist2, is_max_coefficent):
+        i = 0
+        j = 0
+        previous_distance_i = 0
+        previous_distance_j = 0
+        ret = []
+        while i < len(dist1) and j < len(dist2):
+            ret.append((is_max_coefficent * (dist1[i][0] - dist2[j][0]), min(dist1[i][1] - previous_distance_i ,dist2[j][1] - previous_distance_j))
+            if dist1[i][1] - previous_distance_i < dist2[j][1] - previous_distance_j:
+                previous_distance_i = dist1[i][1]
+                i = i + 1
+            else:
+                previous_distance_j = dist2[j][1]
+                j = j + 1
+        
+                
+            
+
+    def _compute_mean_of_distribution_max_0(self, dist):
         mean = dist[0][0] * dist[0][1]
         for i in range(1, len(dist)):
-            mean += dist[i][0] * (dist[i][1] - dist[i - 1][1])
+            mean += max(dist[i][0], 0) * (dist[i][1] - dist[i - 1][1])
         return mean
 
     def _compute_bvoi_of_child(self, Unode, Ucompare_against, is_alpha=False, is_max=True):
@@ -212,14 +230,10 @@ class SearchAlgorithm():
             is_max_coefficent = -1
 
         if not is_alpha:
-            return max([is_max_coefficent * (
-                        self._compute_mean_of_distribution(Unode) - self._compute_mean_of_distribution(
-                    Ucompare_against)), 0])
+            return _compute_mean_of_distribution_max_0(_compute_difference_of_distributions(Unode, Ucompare_against, is_max_coefficent ))
 
         else:
-            return max([is_max_coefficent * (
-                        self._compute_mean_of_distribution(Ucompare_against) - self._compute_mean_of_distribution(
-                    Unode)), 0])
+            return _compute_mean_of_distribution_max_0(_compute_difference_of_distributions(Ucompare_against, Unode, is_max_coefficent ))
 
     def chance_for_dist_biggersmaller_than_val(self, dist, val, bigger_mode=True):
         sum = 0
@@ -384,9 +398,9 @@ class SearchAlgorithm():
         s = []
         alpha_node = self.alpha[node]
         beta1_node = self.beta1[node]
-        alpha_Us = self._compute_Us(alpha_node, [])[0]
+        alpha_Us = self._compute_Us(alpha_node, self.gather_leaves(alpha_node,[]))[0]
         leaves = self.gather_leaves(node, [])
-
+        alpha_nodes = 
         K_queue = []
 
         if self.mode == "FT Greedy":
@@ -414,6 +428,12 @@ class SearchAlgorithm():
                                 maxx = c_bvoi
                                 s = [l]
                         
+        
+        
+        if self.mode == "FT Greedy":
+            print("FT")
+            if len(s) == 0:
+                print("zaza")
         
         return s, K_queue
 
