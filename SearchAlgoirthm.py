@@ -43,8 +43,8 @@ class SearchAlgorithm():
         self.beta1 = dict()
 
         self.conspiracy_queue = []
-        self.BSM_K = 3
-        self.BSM_N = 1
+        self.BSM_K = 5
+        self.BSM_N = 2
         self.node_to_path = dict()
         self.node_to_path_CVIBES = dict()
         self.node_to_dry_Us = dict()
@@ -408,7 +408,8 @@ class SearchAlgorithm():
         s = []
         alpha_node = self.alpha[node]
         beta1_node = self.beta1[node]
-        alpha_Us = self._compute_Us(alpha_node, self.gather_leaves(alpha_node,[]))[0]
+        alpha_Us = self._compute_Us(alpha_node, [])[0]
+        beta_Us = self._compute_Us(beta_node, [])[0]
         leaves = self.gather_leaves(node, [])
 
         K_queue = []
@@ -420,29 +421,25 @@ class SearchAlgorithm():
             maxx = 0
 
         for l in leaves:
-            child_to_Us = self._compute_Us_for_all_children(node, [l])
-            for c in self.children[node]:
-                if len(child_to_Us[c]) > 1 and l not in s:
-                    if c.__hash__() != alpha_node.__hash__():
-                        c_bvoi = self._compute_bvoi_of_child(child_to_Us[c], alpha_Us, is_alpha=False,
+            c = self.node_to_path[l][1]
+            Usc = self._compute_Us_for_node(c, [l])
+            
+            if c.__hash__() != alpha_node.__hash__():
+                c_bvoi = self._compute_bvoi_of_child(Usc, alpha_Us, is_alpha=False,
                                                              is_max=node.is_max)
-                    else:
-                        c_bvoi = self._compute_bvoi_of_child(child_to_Us[c], child_to_Us[beta1_node],
+            else:
+                c_bvoi = self._compute_bvoi_of_child(Usc, beta1_Us],
                                                              is_alpha=True, is_max=node.is_max)
-                    if c_bvoi > 0:
-                        s.append(l)
-                        if self.mode == "FT Greedy":
-                            put_in_queue_l_vpi((l, c_bvoi), K_queue)
-                        if self.mode == "MGSS*":
-                            if c_bvoi > maxx:
-                                maxx = c_bvoi
-                                s = [l]
+            if c_bvoi > 0:
+                s.append(l)
+                if self.mode == "FT Greedy":
+                    put_in_queue_l_vpi((l, c_bvoi), K_queue)
+                if self.mode == "MGSS*":
+                    if c_bvoi > maxx:
+                        maxx = c_bvoi
+                        s = [l]
                         
-        print(self.mode)
-        print(len(leaves))
-        print(len(s))
-        if len(s) == 0 and self.mode != "MGSS*":
-            print("zaza")
+        
         
 
         
@@ -499,7 +496,8 @@ class SearchAlgorithm():
                 max = c_bvoi
                 max_child = c
         if max_child is None:
-            print("Oish noo")
+            print("bk")
+            return alpha_node
         return max_child
 
 

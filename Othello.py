@@ -99,7 +99,7 @@ class OthelloBoard(Node):
     __directions = [(1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1)]
 
     def __init__(self, max, tup, turn, winner, terminal, meanvalue, depth):
-        standard_derv = (36 - depth) * 0.3 / 36
+        standard_derv = (36 - depth) * 0.1 / 36
         self.n = 6
         self.is_max = max
         self.tup = tup
@@ -701,7 +701,7 @@ if __name__ == "__main__":
     
     }
 
-    for i in range(0, 1):
+    for i in range(0, 10):
         fail = 0
         board = play_game(args, mode="FT Greedy", mode2="uct")
         win_sum += board.winner
