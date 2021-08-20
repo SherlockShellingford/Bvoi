@@ -228,7 +228,7 @@ class SearchAlgorithm():
             
 
     def _compute_mean_of_distribution_max_0(self, dist):
-        mean = dist[0][0] * dist[0][1]
+        mean = max(dist[0][0], 0) * dist[0][1]
         for i in range(1, len(dist)):
             mean += max(dist[i][0], 0) * (dist[i][1] - dist[i - 1][1])
         return mean
@@ -409,7 +409,7 @@ class SearchAlgorithm():
         alpha_node = self.alpha[node]
         beta1_node = self.beta1[node]
         alpha_Us = self._compute_Us(alpha_node, [])[0]
-        beta_Us = self._compute_Us(beta_node, [])[0]
+        beta_Us = self._compute_Us(beta1_node, [])[0]
         leaves = self.gather_leaves(node, [])
 
         K_queue = []
@@ -419,30 +419,42 @@ class SearchAlgorithm():
                 K_queue.append((None, -1))
         if self.mode == "MGSS*":
             maxx = 0
-
+        entered = 0
         for l in leaves:
+            if l in s:
+                continue
             c = self.node_to_path[l][1]
             Usc = self._compute_Us_for_node(c, [l])
-            
-            if c.__hash__() != alpha_node.__hash__():
-                c_bvoi = self._compute_bvoi_of_child(Usc, alpha_Us, is_alpha=False,
-                                                             is_max=node.is_max)
-            else:
-                c_bvoi = self._compute_bvoi_of_child(Usc, beta1_Us],
-                                                             is_alpha=True, is_max=node.is_max)
-            if c_bvoi > 0:
-                s.append(l)
-                if self.mode == "FT Greedy":
-                    put_in_queue_l_vpi((l, c_bvoi), K_queue)
-                if self.mode == "MGSS*":
-                    if c_bvoi > maxx:
-                        maxx = c_bvoi
-                        s = [l]
-                        
-        
-        
 
-        
+            if len(Usc) > 1:
+                entered +=1
+                if c.__hash__() != alpha_node.__hash__():
+                    c_bvoi = self._compute_bvoi_of_child(Usc, alpha_Us, is_alpha=False,
+                                                             is_max=node.is_max)
+                else:
+                    c_bvoi = self._compute_bvoi_of_child(Usc, beta_Us, is_alpha=True, is_max=node.is_max)
+
+
+                if c_bvoi > 0:
+                    s.append(l)
+                    if self.mode == "FT Greedy":
+                        put_in_queue_l_vpi((l, c_bvoi), K_queue)
+                    if self.mode == "MGSS*":
+                        if c_bvoi > maxx:
+                            maxx = c_bvoi
+                            s = [l]
+
+        if self.mode == "FT Greedy":
+            print("Lsize:", len(leaves))
+            print("Entered:", entered)
+            print("Size:", len(s))
+        if entered == 0:
+            for l in leaves:
+                if l.meanvalue == Usc[0][0]:
+                    s = [(l, 0)]
+                    K_queue = [(l,0)]
+                    print("x")
+                    break
         return s, K_queue
 
     def _BVOI_select(self, node):
@@ -461,7 +473,7 @@ class SearchAlgorithm():
         s, best_VPI_k_nodes_for_FT = self._batch_gather_greedy(node)
         if self.mode == "MGSS*":
             if len(s) == 0:
-                return [node, self.alpha[node]]
+                return [node]
             else:
                 return self.node_to_path[s[0]]
         if self.mode == "FT Greedy":

@@ -317,8 +317,8 @@ class MCTS(SearchAlgorithm):
         def uct(n):
             "Upper confidence bound for trees"
             initial_heuristic = 1
-            if self.mode != "uct":
-                initial_heuristic = (1 if node.is_max else -1) * corner_heuristic(n, len(self.children[node]))
+            #if self.mode != "uct":
+            #    initial_heuristic = (1 if node.is_max else -1) * corner_heuristic(n, len(self.children[node]))
             return self.Q[n] / self.N[n] + initial_heuristic * self.exploration_weight * math.sqrt(
                 log_N_vertex / self.N[n]
             )

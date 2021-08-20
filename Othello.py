@@ -98,8 +98,8 @@ def bad_heuristic(board, previous_move_size):
 class OthelloBoard(Node):
     __directions = [(1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1)]
 
-    def __init__(self, max, tup, turn, winner, terminal, meanvalue, depth):
-        standard_derv = (36 - depth) * 0.1 / 36
+    def __init__(self, max, tup, turn, winner, terminal, meanvalue, depth, skip = False):
+        standard_derv = (36 - depth) * 0.18 / 36
         self.n = 6
         self.is_max = max
         self.tup = tup
@@ -114,10 +114,13 @@ class OthelloBoard(Node):
         self.buckets = []
         num_of_buckets = 8
         j = 0
+        if skip:
+            return
         for i in np.linspace(0, 1, num_of_buckets + 2):
             self.buckets.append((norm.ppf(i, loc=meanvalue, scale=standard_derv), j / num_of_buckets))
             j = j + 1
         self.buckets = self.buckets[1:-1]
+
 
     def get_legal_moves(self, color):
         """Returns all the legal moves for the given color.
@@ -290,35 +293,39 @@ class OthelloBoard(Node):
             return ret
 
         elif distribution_mode == "corner heuristic":
-            ret = OthelloBoard(not board.is_max, tup, turn, None, None, 0, board.depth + 1)
-            ret.terminal = not ret.has_legal_moves(1 if ret.is_max else -1)
-            if ret.terminal:
-                ret.winner = _find_winner(ret)
-                if ret.winner == 0.5:
-                    ret.meanvalue = 0
-                if ret.winner == 1.0:
-                    ret.meanvalue = 1.0
-                if ret.winner == 0:
-                    ret.meanvalue = -1
+            ret = OthelloBoard(not board.is_max, tup, turn, None, None, 0, board.depth + 1, skip=True)
+            terminal = not ret.has_legal_moves(1 if ret.is_max else -1)
+            if terminal:
+                winner = _find_winner(ret)
+                if winner == 0.5:
+                    meanvalue = 0
+                if winner == 1.0:
+                    meanvalue = 1.0
+                if winner == 0:
+                    meanvalue = -1
+
             else:
-                ret.winner = None
-                ret.meanvalue = corner_heuristic(ret, move_size)
+                winner = None
+                meanvalue = corner_heuristic(ret, move_size)
+            ret = OthelloBoard(not board.is_max, tup, turn, winner, terminal, meanvalue, board.depth + 1)
 
 
         elif distribution_mode == "bad heuristic":
-            ret = OthelloBoard(not board.is_max, tup, turn, None, None, 0, board.depth + 1)
-            ret.terminal = not ret.has_legal_moves(1 if ret.is_max else -1)
-            if ret.terminal:
-                ret.winner = _find_winner(ret)
-                if ret.winner == 0.5:
-                    ret.meanvalue = 0
+            ret = OthelloBoard(not board.is_max, tup, turn, None, None, 0, board.depth + 1, skip=True)
+            terminal = not ret.has_legal_moves(1 if ret.is_max else -1)
+            if terminal:
+                winner = _find_winner(ret)
+                if winner == 0.5:
+                    meanvalue = 0
                 if ret.winner == 1.0:
-                    ret.meanvalue = 1.0
+                    meanvalue = 1.0
                 if ret.winner == 0:
-                    ret.meanvalue = -1
+                    meanvalue = -1
+
             else:
-                ret.winner = None
-                ret.meanvalue = bad_heuristic(ret, move_size)
+                winner = None
+                meanvalue = bad_heuristic(ret, move_size)
+            ret = OthelloBoard(not board.is_max, tup, turn, winner, terminal, meanvalue, board.depth + 1)
 
 
         elif distribution_mode == "NN":
@@ -695,13 +702,13 @@ if __name__ == "__main__":
     sum = 10
     win_sum = 0
     args = {
-    "absolute_rollouts" : False,
-    "rollouts1" : 50,
-    "rollouts2" : 150
+    "absolute_rollouts" : True,
+    "rollouts1" : 100,
+    "rollouts2" : 50
     
     }
 
-    for i in range(0, 10):
+    for i in range(0, 1):
         fail = 0
         board = play_game(args, mode="FT Greedy", mode2="uct")
         win_sum += board.winner

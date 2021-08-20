@@ -243,7 +243,7 @@ def flip_board(board):
 
 def play_game(mode="uct", mode2 ="uct"):
     board = new_tic_tac_toe_board()
-    tree = NormalSearchAlgorithm(board, mode=mode, distribution_mode="weak heuristic")
+    tree = MCTS(board, mode=mode, distribution_mode="weak heuristic")
     tree2 = MCTS(flip_board(board), mode=mode2)
     game=TicTacToeGame()
     #rival=MCTSaz(game,alphazero_agent)
@@ -251,7 +251,7 @@ def play_game(mode="uct", mode2 ="uct"):
 
     print(board.to_pretty_string())
     while True:
-        for i in range(150):
+        for i in range(70):
             tree.do_rollout(board)
         board = tree.choose(board)
         print(board.to_pretty_string())
@@ -261,7 +261,7 @@ def play_game(mode="uct", mode2 ="uct"):
 #        board = flip_board(board)
 
         print(board.tup)
-        for i in range(400):
+        for i in range(150):
             tree2.do_rollout(board)
         board = tree2.choose(board)
         
