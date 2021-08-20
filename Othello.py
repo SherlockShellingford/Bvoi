@@ -702,13 +702,13 @@ if __name__ == "__main__":
     sum = 10
     win_sum = 0
     args = {
-    "absolute_rollouts" : True,
+    "absolute_rollouts" : False,
     "rollouts1" : 100,
     "rollouts2" : 50
     
     }
 
-    for i in range(0, 1):
+    for i in range(0, 10):
         fail = 0
         board = play_game(args, mode="FT Greedy", mode2="uct")
         win_sum += board.winner

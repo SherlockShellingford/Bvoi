@@ -66,7 +66,7 @@ class MCTS(SearchAlgorithm):
 
         def score(n):
             #return self.N[n] #TODO THIS IS A DIFFERENT KIND OF MEASUREMENT, YOU CAN TRY AND REMOVE IT
-            if self.N[n] < 5:
+            if self.N[n] < 15:
                 return float("-inf")  # avoid unseen moves
             return self.Q[n] / self.N[n]  # average reward
 

@@ -444,16 +444,12 @@ class SearchAlgorithm():
                             maxx = c_bvoi
                             s = [l]
 
-        if self.mode == "FT Greedy":
-            print("Lsize:", len(leaves))
-            print("Entered:", entered)
-            print("Size:", len(s))
+        
         if entered == 0:
             for l in leaves:
                 if l.meanvalue == Usc[0][0]:
                     s = [(l, 0)]
                     K_queue = [(l,0)]
-                    print("x")
                     break
         return s, K_queue
 
