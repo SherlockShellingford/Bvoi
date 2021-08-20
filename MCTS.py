@@ -88,9 +88,15 @@ class MCTS(SearchAlgorithm):
         return max(self.children[node], key=score)
 
 
-    def do_rollout(self, node):
+    def do_rollout(self, node, second = False):
         if self.node_to_dry_Us.get(node) is None:
             self.node_to_dry_Us[node] = [(node.meanvalue,1)]
+
+        if second and self.mode == "FT Greedy":
+            for i in range(20):
+                reward = self.simulate(self.alpha[node])
+                self._backpropagate([node, self.alpha[node]], reward)
+
 
         path = self._select(node)
         leaf = path[-1]

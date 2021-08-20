@@ -445,12 +445,13 @@ class SearchAlgorithm():
                             s = [l]
 
         if self.mode == "FT Greedy":
-            print("Lsize:", len(leaves))
+            print("Lsiz:", len(leaves))
             print("Entered:", entered)
             print("Size:", len(s))
-        if entered == 0:
-            for l in leaves:
-                if l.meanvalue == Usc[0][0]:
+        if len(s) == 0:
+            alpha_leaves = self.gather_leaves(alpha_node, [])
+            for l in alpha_leaves:
+                if l.meanvalue == alpha_Us[0][0]:
                     s = [(l, 0)]
                     K_queue = [(l,0)]
                     print("x")

@@ -461,6 +461,17 @@ def new_othello_board():
     return OthelloBoard(True, x, True, None, False, 0, 0)
 
 
+
+def create_test_state():
+    x = []
+    x.append([0, 0, -1, 0, 0, 0])
+    x.append([0, 0, -1, 1, 1, 0])
+    x.append([1, 1, -1, 1, -1, 0])
+    x.append([0, 1, -1, -1, -1, 0])
+    x.append([-1,-1,-1, 1, 0, 0])
+    x.append([ 0, 0, 0, 0, 0, 0])
+    return OthelloBoard(True, x, True, None, False, 0, 0)
+
 def legal_moves_test():
     x = []
     x.append([0, 0, 0, 0, 0, 0])
@@ -506,12 +517,18 @@ def do_turn_mcts(tree, board, is_absolute_rollouts=False, rollouts=0):
     start = time.time()
     if is_absolute_rollouts:
         for i in range(rollouts):
-            tree.do_rollout(board)
+            if i == 2:
+                tree.do_rollout(board, second=True)
+            else:
+                tree.do_rollout(board)
 
     else:
         while True:
             i = i + 1
-            tree.do_rollout(board)
+            if i == 2:
+                tree.do_rollout(board, second=True)
+            else:
+                tree.do_rollout(board)
             end = time.time()
             if end - start - deductable_time + added_time > time_limit:
                 break
@@ -547,7 +564,7 @@ def play_game(args, mode="uct", mode2="uct", distribution_mode="corner heuristic
 
         #board = board.find_random_child() # TODO delete
         board = do_turn_mcts(tree, board, is_absolute_rollouts = args["absolute_rollouts"], rollouts = args["rollouts1"]) #TODO uncomment
-        
+
         
         print(board.to_pretty_string())
 
@@ -626,24 +643,11 @@ if __name__ == "__main__":
     # print("Finished")
     # print(time.time() - start)
     # exit(0)
-    a = MCTS(new_othello_board())
-
-
-    x = []
-    x.append([1, 1, 0, 0, 0, 0])
-    x.append([0, 0, 0, 0, 1, 0])
-    x.append([0, 0, -1, -1, 0, 0])
-    x.append([0, 0, 1, -1, 0, 0])
-    x.append([0, 0, 0, 1, 0, 0])
-    x.append([0, -1, -1, 0, 0, 0])
-    h = new_othello_board()
-    h.tup = x
-    x = corner_heuristic(h, 4)
-    print("xp")
     # f = open("weak_heuristic_othello_backup3", "rb")
-    print("choochoo")
     # weak_heuristic_dict = pickle.load(f)
-
+    #for i in range(10):
+    #    print(do_turn_mcts(MCTS(create_test_state(),mode="FT Greedy", distribution_mode="corner heuristic"),create_test_state()).to_pretty_string())
+    #exit(0)
     # f.close()
     n = new_othello_board().tup
     n = [tuple(lst) for lst in n]
@@ -702,13 +706,13 @@ if __name__ == "__main__":
     sum = 10
     win_sum = 0
     args = {
-    "absolute_rollouts" : True,
+    "absolute_rollouts" : False,
     "rollouts1" : 100,
     "rollouts2" : 50
     
     }
 
-    for i in range(0, 1):
+    for i in range(0, 5):
         fail = 0
         board = play_game(args, mode="FT Greedy", mode2="uct")
         win_sum += board.winner
