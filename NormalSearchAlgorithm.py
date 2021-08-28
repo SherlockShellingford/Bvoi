@@ -18,7 +18,6 @@ class NormalSearchAlgorithm(SearchAlgorithm):
 
     def _select(self, node):
         while True:
-            print("2")
             if node not in self.children or not self.children[node]:
                 # node is either unexplored or terminal
 
@@ -30,7 +29,7 @@ class NormalSearchAlgorithm(SearchAlgorithm):
             elif self.mode == "bvoi-greedy":
                 node = self._BVOI_select(node)
 
-            elif self.mode == "FT Greedy":
+            elif self.mode == "FT Greedy" or self.mode == "MGSS*":
                 node = self._BVOI_select(node)[-1]
             else:
                 node = self._BVOI_select(node)[-1]
@@ -40,7 +39,7 @@ class NormalSearchAlgorithm(SearchAlgorithm):
         "Update the `children` dict with the children of `node`"
         if node in self.children:
             return  # already expanded
-        if self.mode == "bvoi-greedy" or self.mode== "c-vibes" or self.mode == "FT Greedy":
+        if self.mode == "bvoi-greedy" or self.mode== "c-vibes" or self.mode == "FT Greedy" or self.mode == "MGSS*":
             children = node.find_children_bvoi(distribution_mode=self.distribution_mode)
         else:
             children = node.find_children()
@@ -72,14 +71,13 @@ class NormalSearchAlgorithm(SearchAlgorithm):
         self.beta1[node]=second_to_max_c
 
     def minmax_on_expanded_nodes(self, node):
-        print("1")
         if self.children.get(node) is None or node.terminal:
             return node.meanvalue
         else:
-            return max([self.minmax_on_expanded_nodes(c) for c in self.children[node]])
+            return max([self.minmax_on_expanded_nodes(c) for c in self.children[node]]) if node.is_max else min([self.minmax_on_expanded_nodes(c) for c in self.children[node]])
 
 
-    def get_best_child(self, node):
+    def get_best_child(self, node, print_opt = False):
 
         children_list = []
         for c in self.children[node]:
@@ -87,13 +85,16 @@ class NormalSearchAlgorithm(SearchAlgorithm):
         maxx = np.NINF
         maxchild = None
         for p in children_list:
+            if print_opt:
+                print(p[0].tup)
+                print(p[1])
             if p[1] > maxx:
                 maxx=p[1]
                 maxchild=p[0]
         return maxchild
 
     def choose(self, node):
-        return self.get_best_child(node)
+        return self.get_best_child(node, print_opt=True)
 
     def do_rollout(self, node):
         node = self._select(node)

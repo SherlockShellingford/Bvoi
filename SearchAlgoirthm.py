@@ -446,6 +446,7 @@ class SearchAlgorithm():
 
 
         if len(s) == 0:
+            print("len(S)=0")
             alpha_leaves = self.gather_leaves(alpha_node, [])
             for l in alpha_leaves:
                 if l.meanvalue == alpha_Us[0][0]:

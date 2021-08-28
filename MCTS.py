@@ -93,6 +93,7 @@ class MCTS(SearchAlgorithm):
             self.node_to_dry_Us[node] = [(node.meanvalue,1)]
 
         if second and self.mode == "FT Greedy":
+            print("SECOND!!!")
             for i in range(20):
                 reward = self.simulate(self.alpha[node])
                 self._backpropagate([node, self.alpha[node]], reward)
@@ -304,7 +305,7 @@ class MCTS(SearchAlgorithm):
 
     def _backpropagate(self, path, reward):
         "Send the reward back up to the ancestors of the leaf"
-        pass
+        print("backprop")
         for node in reversed(path):
             self.N[node] += 1
             self.Q[node] += reward

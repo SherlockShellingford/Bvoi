@@ -475,8 +475,8 @@ def create_test_state():
 def legal_moves_test():
     x = []
     x.append([0, 0, 0, 0, 0, 0])
-    x.append([0, 1, 0, 0, 1, 0])
-    x.append([0, 0, -1, -1, 0, 0])
+    x.append([0, 1, 0, 0, 0, 0])
+    x.append([0, 0, -1, -1, 1, 0])
     x.append([0, 0, 1, -1, 0, 0])
     x.append([0, 0, 0, 1, 0, 0])
     x.append([0, 0, 0, 0, 0, 0])
@@ -507,6 +507,10 @@ def do_turn_alphazeroagent(mcts, board):
     return board
 
 
+
+
+
+
 def do_turn_mcts(tree, board, is_absolute_rollouts=False, rollouts=0):
     time_limit = 15
     global deductable_time
@@ -520,6 +524,7 @@ def do_turn_mcts(tree, board, is_absolute_rollouts=False, rollouts=0):
             if i == 2:
                 tree.do_rollout(board, second=True)
             else:
+                print("I: ", i)
                 tree.do_rollout(board)
 
     else:
@@ -635,9 +640,38 @@ def simulate_until_no_tomorrow(load=False, start=0):
     f.close()
 
 
+
+
+def do_turn_mcts_no_second(tree, board, is_absolute_rollouts=False, rollouts=0):
+    time_limit = 15
+    global deductable_time
+    global added_time
+    i = 0
+    deductable_time = 0
+    added_time = 0
+    start = time.time()
+    if is_absolute_rollouts:
+        for i in range(rollouts):
+            print("I:", i)
+            tree.do_rollout(board)
+
+    else:
+        while True:
+            i = i + 1
+            tree.do_rollout(board)
+            end = time.time()
+            if end - start - deductable_time + added_time > time_limit:
+                break
+
+    print("Lap", i)
+    print("Deductible:", deductable_time)
+    print("Added:", added_time)
+    board = tree.choose(board)
+    return board
+
 if __name__ == "__main__":
 
-    # import time
+    import time
     # start = time.time()
     # simulate_until_no_tomorrow(load = True, start = start)
     # print("Finished")
@@ -649,6 +683,29 @@ if __name__ == "__main__":
     #    print(do_turn_mcts(MCTS(create_test_state(),mode="FT Greedy", distribution_mode="corner heuristic"),create_test_state()).to_pretty_string())
     #exit(0)
     # f.close()
+
+    x = []
+    x.append([0, 0, 0, 0, 0, 0])
+    x.append([0, 1, 0, 0, 0, 0])
+    x.append([0, 0, -1, -1, 1, 0])
+    x.append([0, 0, 1, -1, 0, 0])
+    x.append([0, 0, 0, 1, 0, 0])
+    x.append([0, 0, 0, 0, 0, 0])
+
+    oo = OthelloBoard(True, x, True, None, False, 0, 0)
+    start = time.time()
+    tree = NormalSearchAlgorithm(oo, mode="MGSS*", distribution_mode="corner heuristic")
+
+    tree2 = NormalSearchAlgorithm(oo, mode="FT Greedy", distribution_mode="corner heuristic")
+
+    board1 = do_turn_mcts_no_second(tree ,oo,is_absolute_rollouts=False)
+    start2 = time.time()
+    print("TIME1:", start - start2)
+    board2 = do_turn_mcts_no_second(tree2 ,oo,is_absolute_rollouts=False)
+
+    print("TIME1:", start2 - time.time())
+    exit(0)
+
     n = new_othello_board().tup
     n = [tuple(lst) for lst in n]
     n = tuple(n)
@@ -672,6 +729,7 @@ if __name__ == "__main__":
 
     one = [[1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1],
            [1, 1, 1, 1, 1, 1]]
+
 
     X = np.asarray(one).astype('float32')
     X = np.reshape(X, (6, 6,))
