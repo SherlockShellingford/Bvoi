@@ -32,6 +32,9 @@ class NormalSearchAlgorithm(SearchAlgorithm):
 
             elif self.mode == "FT Greedy":
                 node = self._BVOI_select(node)[-1]
+            else:
+                node = self._BVOI_select(node)[-1]
+                
 
     def _expand(self, node):
         "Update the `children` dict with the children of `node`"

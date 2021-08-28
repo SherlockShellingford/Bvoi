@@ -449,9 +449,10 @@ class SearchAlgorithm():
             alpha_leaves = self.gather_leaves(alpha_node, [])
             for l in alpha_leaves:
                 if l.meanvalue == alpha_Us[0][0]:
-                    s = [(l, 0)]
+                    s = [l]
                     K_queue = [(l,0)]
                     break
+        
         return s, K_queue
 
     def _BVOI_select(self, node):

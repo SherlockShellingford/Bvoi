@@ -705,6 +705,8 @@ if __name__ == "__main__":
     start = time.time()
     sum = 10
     win_sum = 0
+    win1 = 0
+    win2 = 0
     args = {
     "absolute_rollouts" : False,
     "rollouts1" : 100,
@@ -712,16 +714,31 @@ if __name__ == "__main__":
     
     }
 
-    for i in range(0, 10):
+    for i in range(0, 15):
 
         fail = 0
-        board = play_game(args, mode="FT Greedy", mode2="uct")
+        board = play_game(args,  mode="FT Greedy", mode2="corner uct")
         win_sum += board.winner
+        win1 += board.winner
+        for x in board.tup:
+            if x == 0:
+                fail = 1
+                
+        sum = sum - fail
+    for i in range(0, 15):
+
+        fail = 0
+        board = play_game(args,  mode="MGSS*", mode2="corner uct")
+        win_sum += (1 - board.winner)
+        win2 += board.winner
         for x in board.tup:
             if x == 0:
                 fail = 1
         sum = sum - fail
 
+
+    print("Win1:", win1)
+    print("Win2:", win2)
     print("Win_sum:", win_sum)
     win_sum = 0
     end = time.time()
