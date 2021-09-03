@@ -446,7 +446,6 @@ class SearchAlgorithm():
 
 
         if len(s) == 0:
-            print("len(S)=0")
             alpha_leaves = self.gather_leaves(alpha_node, [])
             for l in alpha_leaves:
                 if l.meanvalue == alpha_Us[0][0]:
@@ -472,12 +471,12 @@ class SearchAlgorithm():
         s, best_VPI_k_nodes_for_FT = self._batch_gather_greedy(node)
         if self.mode == "MGSS*":
             if len(s) == 0:
-                return [node]
+                return [node, self.alpha[node]]
             else:
                 return self.node_to_path[s[0]]
         if self.mode == "FT Greedy":
             if len(s) == 0:
-                return [node]
+                return [node, self.alpha[node]]
             for _ in range(self.BSM_N):
                 for l_vpi_pair in best_VPI_k_nodes_for_FT:
                     if l_vpi_pair[0] is not None:

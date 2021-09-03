@@ -557,20 +557,31 @@ def flip_board(board):
     return OthelloBoard(not board.is_max, tup2, not board.turn, board.winner, board.terminal, 0, board.depth)
 
 
-def play_game(args, mode="uct", mode2="uct", distribution_mode="corner heuristic"):
+
+
+def play_game(args, mode="uct", mode2="uct", distribution_mode="corner heuristic", measure_overhead_rounds = -1 ):
     board = new_othello_board()
     tree = MCTS(board, mode=mode, distribution_mode=distribution_mode)
     tree2 = MCTS(board, mode=mode2, distribution_mode=distribution_mode)
     game = OthelloGame(6)
     # rival=MCTSaz(game,alphazero_agent)
+    time1 = 0
+    time2 = 0
+    rounds_num = measure_overhead_rounds
     print(board.to_pretty_string())
-
+    is_time_measure = lambda :  measure_overhead_rounds > 0
     while True:
-
-        #board = board.find_random_child() # TODO delete
-        board = do_turn_mcts(tree, board, is_absolute_rollouts = args["absolute_rollouts"], rollouts = args["rollouts1"]) #TODO uncomment
-
         
+        #board = board.find_random_child() # TODO delete
+         #####   OVERHEAD MEASUREMENT #####
+        if is_time_measure():
+            start = time.time()
+        ###########  END   ###########
+        board = do_turn_mcts(tree, board, is_absolute_rollouts = args["absolute_rollouts"], rollouts = args["rollouts1"]) #TODO uncomment
+         #####   OVERHEAD MEASUREMENT #####
+        if is_time_measure():
+            time1 += time.time() - start
+        ###########  END   ###########
         print(board.to_pretty_string())
 
 
@@ -580,12 +591,18 @@ def play_game(args, mode="uct", mode2="uct", distribution_mode="corner heuristic
         
 
         board = flip_board(board)
-
-
+        #####   OVERHEAD MEASUREMENT #####
+        if is_time_measure():
+            start = time.time()
+        ###########  END   ###########
         board = do_turn_mcts(tree2, board, is_absolute_rollouts=args["absolute_rollouts"], rollouts=args["rollouts2"])
-
+        #####   OVERHEAD MEASUREMENT #####
+        if is_time_measure():
+            time2 += time.time() - start
+            measure_overhead_rounds -= 1
+        ###########  END   ###########
+        
         if board.terminal:
-            
             board = flip_board(board)
             board.winner = 1 - board.winner
             break
@@ -594,6 +611,7 @@ def play_game(args, mode="uct", mode2="uct", distribution_mode="corner heuristic
         print(board.to_pretty_string())
 
     print(board.to_pretty_string())
+    print("OVERHEAD:", (time1 - time2) / rounds_num)
     return board
 
 
@@ -684,28 +702,7 @@ if __name__ == "__main__":
     #exit(0)
     # f.close()
 
-    x = []
-    x.append([0, 0, 0, 0, 0, 0])
-    x.append([0, 1, 0, 0, 0, 0])
-    x.append([0, 0, -1, -1, 1, 0])
-    x.append([0, 0, 1, -1, 0, 0])
-    x.append([0, 0, 0, 1, 0, 0])
-    x.append([0, 0, 0, 0, 0, 0])
-
-    oo = OthelloBoard(True, x, True, None, False, 0, 0)
-    start = time.time()
-    tree = NormalSearchAlgorithm(oo, mode="MGSS*", distribution_mode="corner heuristic")
-
-    tree2 = NormalSearchAlgorithm(oo, mode="FT Greedy", distribution_mode="corner heuristic")
-
-    board1 = do_turn_mcts_no_second(tree ,oo,is_absolute_rollouts=False)
-    start2 = time.time()
-    print("TIME1:", start - start2)
-    board2 = do_turn_mcts_no_second(tree2 ,oo,is_absolute_rollouts=False)
-
-    print("TIME1:", start2 - time.time())
-    exit(0)
-
+ 
     n = new_othello_board().tup
     n = [tuple(lst) for lst in n]
     n = tuple(n)
@@ -766,35 +763,35 @@ if __name__ == "__main__":
     win1 = 0
     win2 = 0
     args = {
-    "absolute_rollouts" : False,
-    "rollouts1" : 100,
-    "rollouts2" : 50
+    "absolute_rollouts" : True,
+    "rollouts1" : 120,
+    "rollouts2" : 150
     
     }
 
     for i in range(0, 15):
 
         fail = 0
-        board = play_game(args,  mode="FT Greedy", mode2="corner uct")
+        board = play_game(args,  mode="FT Greedy", mode2="corner_uct", measure_overhead_rounds = 5)
         win_sum += board.winner
         win1 += board.winner
-        for x in board.tup:
-            if x == 0:
-                fail = 1
-                
-        sum = sum - fail
+        states_cache_bvoi = dict()
+    
+    print("W1:", win1)
+    
+    
+    swtch = args["rollouts1"]
+    args["rollouts1"] = args["rollouts2"]
+    args["rollouts2"] = swtch 
+    
     for i in range(0, 15):
 
         fail = 0
-        board = play_game(args,  mode="MGSS*", mode2="corner uct")
+        board = play_game(args,  mode="corner_uct", mode2="FT Greedy", measure_overhead_rounds = 5)
         win_sum += (1 - board.winner)
         win2 += board.winner
-        for x in board.tup:
-            if x == 0:
-                fail = 1
-        sum = sum - fail
-
-
+        states_cache_bvoi = dict()
+    
     print("Win1:", win1)
     print("Win2:", win2)
     print("Win_sum:", win_sum)

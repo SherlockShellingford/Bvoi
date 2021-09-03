@@ -305,7 +305,6 @@ class MCTS(SearchAlgorithm):
 
     def _backpropagate(self, path, reward):
         "Send the reward back up to the ancestors of the leaf"
-        print("backprop")
         for node in reversed(path):
             self.N[node] += 1
             self.Q[node] += reward

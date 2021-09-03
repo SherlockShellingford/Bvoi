@@ -96,6 +96,6 @@ class NormalSearchAlgorithm(SearchAlgorithm):
     def choose(self, node):
         return self.get_best_child(node, print_opt=True)
 
-    def do_rollout(self, node):
+    def do_rollout(self, node, second = False):
         node = self._select(node)
         self._expand(node)
