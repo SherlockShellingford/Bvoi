@@ -772,7 +772,7 @@ if __name__ == "__main__":
     for i in range(0, 15):
 
         fail = 0
-        board = play_game(args,  mode="FT Greedy", mode2="corner_uct", measure_overhead_rounds = 5)
+        board = play_game(args,  mode="FT Greedy", mode2="corner uct", measure_overhead_rounds = 5)
         win_sum += board.winner
         win1 += board.winner
         states_cache_bvoi = dict()
@@ -787,7 +787,7 @@ if __name__ == "__main__":
     for i in range(0, 15):
 
         fail = 0
-        board = play_game(args,  mode="corner_uct", mode2="FT Greedy", measure_overhead_rounds = 5)
+        board = play_game(args,  mode="corner uct", mode2="FT Greedy", measure_overhead_rounds = 5)
         win_sum += (1 - board.winner)
         win2 += board.winner
         states_cache_bvoi = dict()
