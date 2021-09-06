@@ -612,7 +612,7 @@ def play_game(args, mode="uct", mode2="uct", distribution_mode="corner heuristic
 
     print(board.to_pretty_string())
     print("OVERHEAD:", (time1 - time2) / rounds_num)
-    return board
+    return board, time1, time2
 
 
 def simulate2(node, dict, start=0):
@@ -768,11 +768,14 @@ if __name__ == "__main__":
     "rollouts2" : 150
     
     }
-
-    for i in range(0, 15):
+    total_time1 = 0
+    total_time2 = 0
+    for i in range(0, 10):
 
         fail = 0
-        board = play_game(args,  mode="FT Greedy", mode2="corner uct", measure_overhead_rounds = 5)
+        board, time1, time2 = play_game(args,  mode="FT Greedy", mode2="MGSS*", measure_overhead_rounds = 5)
+        total_time1 += time1
+        total_time2 += time2
         win_sum += board.winner
         win1 += board.winner
         states_cache_bvoi = dict()
@@ -784,13 +787,19 @@ if __name__ == "__main__":
     args["rollouts1"] = args["rollouts2"]
     args["rollouts2"] = swtch 
     
-    for i in range(0, 15):
+    for i in range(0, 10):
 
         fail = 0
-        board = play_game(args,  mode="corner uct", mode2="FT Greedy", measure_overhead_rounds = 5)
+        board, time1, time2 = play_game(args,  mode="MGSS*", mode2="FT Greedy", measure_overhead_rounds = 5)
+        total_time1 += time2
+        total_time2 += time1
         win_sum += (1 - board.winner)
         win2 += board.winner
         states_cache_bvoi = dict()
+    
+    
+    print("Total time1:", time1)
+    print("Total time2:", time2)
     
     print("Win1:", win1)
     print("Win2:", win2)
@@ -798,7 +807,5 @@ if __name__ == "__main__":
     win_sum = 0
     end = time.time()
     print("Time:", start - end)
-
-
 
 

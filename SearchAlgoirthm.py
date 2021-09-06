@@ -525,5 +525,3 @@ def put_in_queue_l_vpi(l_vpi_pair, queue):
             shift_right_with_value(queue, i, l_vpi_pair)
             return
 
-
-
