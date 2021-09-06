@@ -115,11 +115,13 @@ class MCTS(SearchAlgorithm):
     def _select(self, node):
         "Find an unexplored descendent of `node`"
         start = time.time()
+
         path = []
         first=True
         #DEBUG
         which = 0
         #DEBUG
+        print("2")
         while True:
             path.append(node)
             if node not in self.children or not self.children[node]:
