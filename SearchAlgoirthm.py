@@ -9,30 +9,30 @@ from scipy.integrate import quad
 from CVIBES.PrioritizedItem import PrioritizedItem
 from queue import PriorityQueue
 
+
 def corner_heuristic(board, previous_move_size):
     sum = 0
 
     count_heuristic = 0
     for x in range(6):
         for y in range(6):
-            if board.tup66[x][y]!=0:
-                sum+=1
-            count_heuristic+=board.tup66[x][y]
-    count_heuristic = count_heuristic/sum
+            if board.tup66[x][y] != 0:
+                sum += 1
+            count_heuristic += board.tup66[x][y]
+    count_heuristic = count_heuristic / sum
     if not board.is_max:
-        move_size = len(board.get_legal_moves( -1))
+        move_size = len(board.get_legal_moves(-1))
         move_heuristic = (previous_move_size - move_size) / (move_size + previous_move_size)
     else:
-        move_size = len(board.get_legal_moves( 1))
+        move_size = len(board.get_legal_moves(1))
         move_heuristic = (move_size - previous_move_size) / (move_size + previous_move_size)
-    corner_heuristic = board.tup[0][0] + board.tup[5][5] + board.tup[5][0] +board.tup[0][5]
+    corner_heuristic = board.tup[0][0] + board.tup[5][5] + board.tup[5][0] + board.tup[0][5]
     corner_heuristic = corner_heuristic / 4
     border_heuristic = 0
-    for i in range(1,4):
-        border_heuristic += board.tup[0][i] + board.tup[i][5] + board.tup[5][i] +board.tup[i][0]
-    border_heuristic = border_heuristic/16
-    return count_heuristic*0.1 + move_heuristic*0.15+corner_heuristic*0.65+border_heuristic*0.1
-
+    for i in range(1, 4):
+        border_heuristic += board.tup[0][i] + board.tup[i][5] + board.tup[5][i] + board.tup[i][0]
+    border_heuristic = border_heuristic / 16
+    return count_heuristic * 0.1 + move_heuristic * 0.15 + corner_heuristic * 0.65 + border_heuristic * 0.1
 
 
 class SearchAlgorithm():
@@ -207,7 +207,7 @@ class SearchAlgorithm():
         ret = []
         cdf = 0
         while i < len(dist1) and j < len(dist2):
-            dist = min(dist1[i][1] - previous_distance_j ,dist2[j][1] - previous_distance_i)
+            dist = min(dist1[i][1] - previous_distance_j, dist2[j][1] - previous_distance_i)
             if dist:
                 ret.append((is_max_coefficent * (dist1[i][0] - dist2[j][0]), cdf + dist))
             cdf = ret[-1][1]
@@ -223,9 +223,6 @@ class SearchAlgorithm():
                 previous_distance_j = dist2[j][1]
                 j = j + 1
         return ret
-        
-                
-            
 
     def _compute_mean_of_distribution_max_0(self, dist):
         mean = max(dist[0][0], 0) * dist[0][1]
@@ -240,10 +237,12 @@ class SearchAlgorithm():
             is_max_coefficent = -1
 
         if not is_alpha:
-            return self._compute_mean_of_distribution_max_0(self._compute_difference_of_distributions(Unode, Ucompare_against, is_max_coefficent ))
+            return self._compute_mean_of_distribution_max_0(
+                self._compute_difference_of_distributions(Unode, Ucompare_against, is_max_coefficent))
 
         else:
-            return self._compute_mean_of_distribution_max_0(self._compute_difference_of_distributions(Ucompare_against, Unode, is_max_coefficent ))
+            return self._compute_mean_of_distribution_max_0(
+                self._compute_difference_of_distributions(Ucompare_against, Unode, is_max_coefficent))
 
     def chance_for_dist_biggersmaller_than_val(self, dist, val, bigger_mode=True):
         sum = 0
@@ -427,13 +426,12 @@ class SearchAlgorithm():
             Usc = self._compute_Us_for_node(c, [l])
 
             if len(Usc) > 1:
-                entered +=1
+                entered += 1
                 if c.__hash__() != alpha_node.__hash__():
                     c_bvoi = self._compute_bvoi_of_child(Usc, alpha_Us, is_alpha=False,
-                                                             is_max=node.is_max)
+                                                         is_max=node.is_max)
                 else:
                     c_bvoi = self._compute_bvoi_of_child(Usc, beta_Us, is_alpha=True, is_max=node.is_max)
-
 
                 if c_bvoi > 0:
                     s.append(l)
@@ -444,15 +442,14 @@ class SearchAlgorithm():
                             maxx = c_bvoi
                             s = [l]
 
-
         if len(s) == 0:
             alpha_leaves = self.gather_leaves(alpha_node, [])
             for l in alpha_leaves:
                 if l.meanvalue == alpha_Us[0][0]:
                     s = [l]
-                    K_queue = [(l,0)]
+                    K_queue = [(l, 0)]
                     break
-        
+
         return s, K_queue
 
     def _BVOI_select(self, node):
@@ -509,8 +506,6 @@ class SearchAlgorithm():
             print("bk")
             return alpha_node
         return max_child
-
-
 
 
 def shift_right_with_value(queue, index, new_value):
